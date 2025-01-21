@@ -18,7 +18,8 @@ RUN nix build .#hawkeye
 # Run the binary
 VOLUME /data
 VOLUME /root/.ssh
+VOLUME /db
 CMD ["/app/result/bin/hawkeye"]
-EXPOSE 3000
+EXPOSE 5777
 
 # Reminder: Command to run this image with terminal is `docker run -it <image> /bin/bash`

@@ -39,7 +39,7 @@ async fn main() -> Result<()> {
         .nest("/api/v1", api_v1);
 
     // Start the server
-    let port = std::env::var("PORT").unwrap_or("3000".to_string());
+    let port = std::env::var("PORT").unwrap_or("5777".to_string());
     eprintln!("{}", format!("[ Starting Hawkeye Backend on {port}... ]").green());
     let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{port}")).await
         .context("Couldn't start up listener!")?;
