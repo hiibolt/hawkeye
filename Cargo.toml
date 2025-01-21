@@ -1,0 +1,12 @@
+[package]
+name = "hawkeye"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.95"
+axum = "0.8.1"
+colored = "3.0.0"
+openssh = { version = "0.11.2", features = [ "native-mux" ] }
+rusqlite = "0.33.0"
+tokio = { version = "1", features = ["full"] }
