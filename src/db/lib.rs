@@ -1,13 +1,27 @@
-use std::collections::{BTreeMap, HashSet};
+use std::{collections::{BTreeMap, HashSet}, sync::Arc};
 
 use anyhow::{Context, Result};
 use rusqlite::{params, Connection};
 use colored::Colorize;
+use tokio::sync::Mutex;
+
+use crate::remote::command::remote_command;
+
+use super::super::{
+    daemons::groups::grab_group_thread,
+    routes::AppState,
+    remote::auth::verify_login,
+};
 
 #[derive(Debug)]
 pub struct DB {
     conn: Connection,
 }
+pub struct LoginResult {
+    pub success: bool,
+    pub created_new: bool
+}
+
 impl DB {
     pub fn new (
         path: &str
@@ -69,15 +83,6 @@ impl DB {
                 mem REAL NOT NULL,
                 FOREIGN KEY (pbs_id) REFERENCES Jobs(pbs_id)
             )",
-            [],
-        )?;
-
-        conn.execute(
-            "INSERT OR IGNORE INTO Groups (name) VALUES ('admin')",
-            [],
-        )?;
-        conn.execute(
-            "INSERT OR IGNORE INTO Groups (name) VALUES ('zwlab')",
             [],
         )?;
         
@@ -202,7 +207,72 @@ impl DB {
         Ok(rows.flatten().collect())
     }
 
-    pub fn get_job_stats(
+    pub fn get_all_running_jobs (
+        &mut self,
+        censor: bool
+    ) -> Result<Vec<BTreeMap<String, String>>> {
+        let mut stmt = self.conn.prepare("SELECT * FROM Jobs WHERE state = 'R'")?;
+        let rows = stmt.query_map([], |row| {
+            Ok(BTreeMap::from_iter(vec![
+                ("pbs_id".to_string(), row.get::<_, i32>(0)?.to_string()),
+                ("name".to_string(), row.get::<_, String>(1)?),
+                ("owner".to_string(), if censor { "REDACTED".to_string() } else { row.get::<_, String>(2)? }),
+                ("state".to_string(), row.get::<_, String>(3)?),
+                ("stime".to_string(), row.get::<_, String>(4)?),
+                ("queue".to_string(), row.get::<_, String>(5)?),
+                ("nodes".to_string(), row.get::<_, String>(6)?),
+                ("req_mem".to_string(), row.get::<_, f64>(7)?.to_string()),
+                ("req_cpus".to_string(), row.get::<_, i32>(8)?.to_string()),
+                ("req_gpus".to_string(), row.get::<_, i32>(9)?.to_string()),
+                ("req_walltime".to_string(), row.get::<_, String>(10)?),
+                ("req_select".to_string(), row.get::<_, String>(11)?),
+                ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
+                ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
+                ("state".to_string(), row.get::<_, String>(3)?),
+                ("stime".to_string(), row.get::<_, String>(4)?),
+                ("queue".to_string(), row.get::<_, String>(5)?),
+                ("nodes".to_string(), row.get::<_, String>(6)?),
+                ("req_mem".to_string(), row.get::<_, f64>(7)?.to_string()),
+                ("req_cpus".to_string(), row.get::<_, i32>(8)?.to_string()),
+                ("req_gpus".to_string(), row.get::<_, i32>(9)?.to_string()),
+                ("req_walltime".to_string(), row.get::<_, String>(10)?),
+                ("req_select".to_string(), row.get::<_, String>(11)?),
+                ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
+                ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
+            ]))
+        }).context("Failed to get rows!")?;
+    
+        Ok(rows.flatten().collect())
+    }
+
+    pub fn get_group_jobs (
+        &mut self,
+        group: &str,
+    ) -> Result<Vec<BTreeMap<String, String>>> {
+        let mut stmt = self.conn.prepare("SELECT * FROM Jobs WHERE owner IN (SELECT user_name FROM UserGroups WHERE group_name = ?1)")?;
+        let rows = stmt.query_map([group], |row| {
+            Ok(BTreeMap::from_iter(vec![
+                ("pbs_id".to_string(), row.get::<_, i32>(0)?.to_string()),
+                ("name".to_string(), row.get::<_, String>(1)?),
+                ("owner".to_string(), row.get::<_, String>(2)?),
+                ("state".to_string(), row.get::<_, String>(3)?),
+                ("stime".to_string(), row.get::<_, String>(4)?),
+                ("queue".to_string(), row.get::<_, String>(5)?),
+                ("nodes".to_string(), row.get::<_, String>(6)?),
+                ("req_mem".to_string(), row.get::<_, f64>(7)?.to_string()),
+                ("req_cpus".to_string(), row.get::<_, i32>(8)?.to_string()),
+                ("req_gpus".to_string(), row.get::<_, i32>(9)?.to_string()),
+                ("req_walltime".to_string(), row.get::<_, String>(10)?),
+                ("req_select".to_string(), row.get::<_, String>(11)?),
+                ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
+                ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
+            ]))
+        }).context("Failed to get rows!")?;
+    
+        Ok(rows.flatten().collect())
+    }
+
+    pub fn get_job_stats (
         &mut self,
         pbs_id: i32,
     ) -> Result<Vec<BTreeMap<String, String>>> {
@@ -219,12 +289,97 @@ impl DB {
         Ok(rows.flatten().collect())
     }
 
-    pub fn get_users(
+    pub fn get_users (
         &mut self,
     ) -> Result<Vec<String>> {
         let mut stmt = self.conn.prepare("SELECT name FROM Users")?;
         let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
     
         Ok(rows.flatten().collect())
+    }
+
+    pub fn is_user_able_to_view_stats (
+        &mut self,
+        user: &str,
+        pbs_id: i32,
+    ) -> Result<bool> {
+        // Firstly, if the user is in the `hpc` group,
+        //  they are allowed to view advanced stats for
+        //  any job.
+        if self.is_user_admin(user)? {
+            return Ok(true);
+        }
+
+        // Note that a user is also allowed to view advanced 
+        //  stats if the job was created by another user in
+        //  the same group as the current user.
+        let mut stmt = self.conn.prepare("SELECT COUNT(*) FROM Jobs WHERE pbs_id = ?1 AND (owner = ?2 OR owner IN (SELECT user_name FROM UserGroups WHERE group_name IN (SELECT group_name FROM UserGroups WHERE user_name = ?2)))")?;
+        let count: i32 = stmt.query_row([pbs_id.to_string(), user.to_string()], |row| row.get(0))?;
+
+        Ok(count > 0)
+    }
+
+    pub fn is_user_in_group (
+        &mut self,
+        user: &str,
+        group: &str,
+    ) -> Result<bool> {
+        let mut stmt = self.conn.prepare("SELECT COUNT(*) FROM UserGroups WHERE user_name = ?1 AND group_name = ?2")?;
+        let count: i32 = stmt.query_row([user, group], |row| row.get(0))?;
+    
+        Ok(count > 0)
+    }
+
+    pub fn is_user_admin (
+        &mut self,
+        user: &str,
+    ) -> Result<bool> {
+        self.is_user_in_group(user, "hpc")
+    }
+
+    pub async fn login (
+        &mut self,
+        remote_username: &str,
+        remote_hostname: &str,
+        username: &str,
+        password: &str
+    ) -> Result<LoginResult> {
+
+        match verify_login(
+            remote_username,
+            remote_hostname,
+            &username,
+            &password
+        )
+            .await
+            .context("Failed to verify login!")?
+        {
+            true => {
+                // Check if the user exists in the DB
+                let mut stmt = self.conn.prepare("SELECT COUNT(*) FROM Users WHERE name = ?1")?;
+                let count: i32 = stmt.query_row([username], |row| row.get(0))?;
+                drop(stmt);
+
+                // If the user doesn't exist, add them and
+                //  populate their groups
+                if count == 0 {
+                    self.conn.execute(
+                        "INSERT INTO Users (name) VALUES (?1)",
+                        [username],
+                    )?;
+                }
+
+                Ok(LoginResult {
+                    success: true,
+                    created_new: count == 0,
+                })
+            },
+            false => {
+                Ok(LoginResult {
+                    success: false,
+                    created_new: false,
+                })
+            }
+        }
     }
 }

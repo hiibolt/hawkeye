@@ -58,6 +58,9 @@ async fn grab_jobs_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
 }
 
 pub async fn jobs_daemon ( app: Arc<Mutex<AppState>> ) {
+    // Wait for the web server to start up
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+    
     loop {
         eprintln!("{}", "[ Pulling jobs... ]".green());
         if let Err(e) = grab_jobs_helper( app.clone() ).await {

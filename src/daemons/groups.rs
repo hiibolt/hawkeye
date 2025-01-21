@@ -6,16 +6,17 @@ use futures::future::join_all;
 use tokio::task::JoinHandle;
 use tokio::sync::Mutex;
 
+use crate::remote;
 use crate::routes::AppState;
 use super::super::remote::command::*;
 
 const GROUPS_PERIOD: u64 = 60 * 60;
 
-async fn grab_group_thread (
+pub async fn grab_group_thread (
     app: Arc<Mutex<AppState>>,
-    user: &str,
-    remote_username: String,
-    remote_hostname: String
+    remote_username: &str,
+    remote_hostname: &str,
+    user: &str
 ) -> Result<()> {
     let group_output: String = remote_command(
         &remote_username,
@@ -52,29 +53,27 @@ async fn grab_groups_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
         .get_users()
         .context("Couldn't get users!")?;
 
-    // Reserve the remote username and hostname
+    println!("[ Got Users ]: {users:?}");
+
     let (remote_username, remote_hostname) = {
         let state = app.lock().await;
         
         (state.remote_username.clone(), state.remote_hostname.clone())
     };
 
-    println!("[ Got Users ]: {users:?}");
-
     // Spawn a task for each user, but collect the JoinHandles
     let mut tasks: Vec<JoinHandle<()>> = Vec::new();
     for user in users {
-        let app_clone = app.clone();
-        let remote_username_clone = remote_username.clone();
-        let remote_hostname_clone = remote_hostname.clone();
-
+        let app = app.clone();
+        let remote_username = remote_username.clone();
+        let remote_hostname = remote_hostname.clone();
         let handle = tokio::spawn(async move {
             // We deliberately swallow the actual Result here, but you could propagate it
             if let Err(e) = grab_group_thread(
-                app_clone,
-                &user,
-                remote_username_clone,
-                remote_hostname_clone
+                app,
+                &remote_username,
+                &remote_hostname,
+                &user
             ).await {
                 eprintln!("[ ERROR ] Failed to grab groups for {user}! Error: {e:?}");
             }
@@ -90,6 +89,9 @@ async fn grab_groups_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
 }
 
 pub async fn groups_daemon ( app: Arc<Mutex<AppState>> ) {
+    // Wait for the web server to start up
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
     loop {
         eprintln!("{}", "[ Pulling groups... ]".green());
         if let Err(e) = grab_groups_helper( app.clone() ).await {

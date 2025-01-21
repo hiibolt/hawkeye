@@ -1,5 +1,6 @@
 pub mod jobs;
 pub mod stats;
+pub mod auth;
 
 pub struct AppState {
     pub remote_username: String,

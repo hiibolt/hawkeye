@@ -6,16 +6,25 @@ mod routes;
 
 use db::lib::*;
 use daemons::{jobs::jobs_daemon, groups::groups_daemon};
-use routes::{jobs::jobs_handler, stats::stats_handler, AppState};
+use routes::{
+    jobs::jobs_handler,
+    stats::stats_handler,
+    auth::{login_handler, logout_handler},
+    AppState
+};
+use remote::auth::verify_login;
 
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use tokio::sync::Mutex;
 use axum::{
-    routing::get, Router
+    routing::{get, post}, Router
 };
 use colored::Colorize;
+use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
+use time::Duration;
+
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -30,18 +39,35 @@ async fn main() -> Result<()> {
         ).context("Failed to establish connection to DB!")?
     }));
     
-    jobs_daemon(state.clone()).await;
-    groups_daemon(state.clone()).await;
+    eprintln!("{}", "[ Starting daemons... ]".green());
+    tokio::spawn(jobs_daemon(state.clone()));
+    tokio::spawn(groups_daemon(state.clone()));
+    eprintln!("{}", "[ Daemons started! ]".green());
+
+    // Create the Session store and layer
+    let session_store = MemoryStore::default();
+    // E.g. sessions expire after 30 minutes of inactivity
+    let session_layer = SessionManagerLayer::new(session_store)
+        .with_secure(false) // true requires HTTPS; set appropriately
+        .with_expiry(Expiry::OnInactivity(Duration::minutes(30)));
+
+    // Build auth router
+    let auth_routes = Router::new()
+        .route("/login", post(login_handler))
+        .route("/logout", post(logout_handler))
+        .with_state(state.clone());
 
     // Build the V1 API router
     let api_v1 = Router::new()
         .route("/jobs", get(jobs_handler))
         .route("/stats", get(stats_handler))
+        .nest("/auth", auth_routes)
         .with_state(state.clone());
 
     // Nest the API into the general app router
     let app = Router::new()
-        .nest("/api/v1", api_v1);
+        .nest("/api/v1", api_v1)
+        .layer(session_layer);
 
     // Start the server
     let port = std::env::var("PORT").unwrap_or("5777".to_string());
