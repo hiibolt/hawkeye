@@ -14,11 +14,15 @@ use tokio::sync::Mutex;
 const JOBSTAT_PERIOD: u64 = 60 * 5;
 
 async fn grab_jobs_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
+    let (username, hostname) = {
+        let state = app.lock().await;
+        
+        (state.remote_username.clone(), state.remote_hostname.clone())
+    };
+
     let jobstat_output: String = remote_command(
-        &std::env::var("REMOTE_USERNAME")
-            .context("Missing `REMOTE_USERNAME` environment variable!")?,
-        &std::env::var("REMOTE_HOSTNAME")
-            .context("Missing `REMOTE_HOSTNAME` environment variable!")?,
+        &username,
+        &hostname,
         "jobstat",
         vec!["-anL"],
         true
@@ -55,14 +59,14 @@ async fn grab_jobs_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
 
 pub async fn jobs_daemon ( app: Arc<Mutex<AppState>> ) {
     loop {
-        eprintln!("{}", "[ Pulling data... ]".green());
+        eprintln!("{}", "[ Pulling jobs... ]".green());
         if let Err(e) = grab_jobs_helper( app.clone() ).await {
             eprintln!("[ ERROR ] Failed to run remote command! Error: {e:?}");
 
             tokio::time::sleep(tokio::time::Duration::from_secs(JOBSTAT_PERIOD)).await;
             continue;
         };
-        eprintln!("{}", "[ Data pulled! ]".green());
+        eprintln!("{}", "[ Jobs pulled! ]".green());
 
         tokio::time::sleep(tokio::time::Duration::from_secs(JOBSTAT_PERIOD)).await;
     }

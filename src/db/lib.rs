@@ -30,6 +30,17 @@ impl DB {
         )?;
 
         conn.execute(
+            "CREATE TABLE IF NOT EXISTS UserGroups (
+                user_name TEXT NOT NULL,
+                group_name TEXT NOT NULL,
+                PRIMARY KEY (user_name, group_name),
+                FOREIGN KEY (user_name) REFERENCES Users(name) ON DELETE CASCADE,
+                FOREIGN KEY (group_name) REFERENCES Groups(name) ON DELETE CASCADE
+            )",
+            [],
+        )?;
+
+        conn.execute(
             "CREATE TABLE IF NOT EXISTS Jobs (
                 pbs_id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -77,7 +88,7 @@ impl DB {
     pub fn insert_job ( &mut self, job: &BTreeMap<&str, String> ) -> Result<()> {
         self.conn.execute(
             "INSERT OR IGNORE INTO Users (name) VALUES (?1)",
-            [&job["Job_Name"]],
+            [&job["Job_Owner"]],
         )?;
         
         // Add the job
@@ -109,6 +120,23 @@ impl DB {
                 job["resources_used.cpupercent"],
                 job["resources_used.mem"],
             ],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn insert_user_group (
+        &mut self,
+        user: &str,
+        group: &str,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT OR IGNORE INTO Groups (name) VALUES (?1)",
+            [group],
+        )?;
+        self.conn.execute(
+            "INSERT OR IGNORE INTO UserGroups (user_name, group_name) VALUES (?1, ?2)",
+            [user, group],
         )?;
 
         Ok(())
@@ -187,6 +215,15 @@ impl DB {
                 ("mem".to_string(), row.get::<_, f64>(3)?.to_string()),
             ]))
         }).context("Failed to get rows!")?;
+    
+        Ok(rows.flatten().collect())
+    }
+
+    pub fn get_users(
+        &mut self,
+    ) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT name FROM Users")?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
     
         Ok(rows.flatten().collect())
     }

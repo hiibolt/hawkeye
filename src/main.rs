@@ -5,7 +5,7 @@ mod daemons;
 mod routes;
 
 use db::lib::*;
-use daemons::jobs::*;
+use daemons::{jobs::jobs_daemon, groups::groups_daemon};
 use routes::{jobs::jobs_handler, stats::stats_handler, AppState};
 
 use std::sync::Arc;
@@ -20,6 +20,10 @@ use colored::Colorize;
 #[tokio::main]
 async fn main() -> Result<()> {
     let state: Arc<Mutex<AppState>> = Arc::new(Mutex::new(AppState {
+        remote_username: std::env::var("REMOTE_USERNAME")
+            .context("Missing `REMOTE_USERNAME` environment variable!")?,
+        remote_hostname: std::env::var("REMOTE_HOSTNAME")
+            .context("Missing `REMOTE_HOSTNAME` environment variable!")?,
         db: DB::new(
             &std::env::var("DB_PATH")
                 .context("Missing `DB_PATH` environment variable!")?
@@ -27,6 +31,7 @@ async fn main() -> Result<()> {
     }));
     
     jobs_daemon(state.clone()).await;
+    groups_daemon(state.clone()).await;
 
     // Build the V1 API router
     let api_v1 = Router::new()
