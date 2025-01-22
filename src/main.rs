@@ -64,7 +64,11 @@ async fn main() -> Result<()> {
     let session_store = MemoryStore::default();
     // E.g. sessions expire after 30 minutes of inactivity
     let session_layer = SessionManagerLayer::new(session_store)
-        .with_secure(false) // true requires HTTPS; set appropriately
+        .with_secure(
+            std::env::var("DEV_MODE")
+                .and_then(|v| Ok(v != "true"))
+                .unwrap_or(true) // true requires HTTPS; set appropriately
+        ) // true requires HTTPS; set appropriately
         .with_expiry(Expiry::OnInactivity(Duration::minutes(30)));
 
     // Build auth router
