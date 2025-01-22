@@ -1,4 +1,5 @@
-use std::collections::{BTreeMap, HashSet};
+use std::{collections::{BTreeMap, HashSet}, time::{SystemTime, UNIX_EPOCH}};
+use chrono::{DateTime, Utc};
 
 use anyhow::{Context, Result};
 use rusqlite::{params, Connection};
@@ -75,6 +76,7 @@ impl DB {
                 pbs_id INTEGER NOT NULL,
                 cpu_percent REAL NOT NULL,
                 mem REAL NOT NULL,
+                datetime STRING NOT NULL,
                 FOREIGN KEY (pbs_id) REFERENCES Jobs(pbs_id)
             )",
             [],
@@ -113,12 +115,19 @@ impl DB {
         )?;
         
         // Add the latest stats
+        // Get the current system time
+        let now = SystemTime::now();
+        let duration_since_epoch = now.duration_since(UNIX_EPOCH)
+            .context("Time went backwards")?;
+        let datetime = DateTime::<Utc>::from(UNIX_EPOCH + duration_since_epoch);
+        let formatted_datetime = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
         self.conn.execute(
-            "INSERT INTO PastStats (pbs_id, cpu_percent, mem) VALUES (?1, ?2, ?3)",
+            "INSERT INTO PastStats (pbs_id, cpu_percent, mem, datetime) VALUES (?1, ?2, ?3, ?4)",
             params![
                 job["job_id"],
                 job["resources_used.cpupercent"],
                 job["resources_used.mem"],
+                formatted_datetime
             ],
         )?;
 
@@ -269,6 +278,7 @@ impl DB {
                 ("pbs_id".to_string(), row.get::<_, i32>(1)?.to_string()),
                 ("cpu_percent".to_string(), row.get::<_, f64>(2)?.to_string()),
                 ("mem".to_string(), row.get::<_, f64>(3)?.to_string()),
+                ("datetime".to_string(), row.get::<_, String>(4)?),
             ]))
         }).context("Failed to get rows!")?;
     

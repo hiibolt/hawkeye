@@ -12,7 +12,7 @@ pub async fn stats_handler(
     Query(params): Query<HashMap<String, String>>,
     session: Session
 ) -> Result<Json<Vec<BTreeMap<String, String>>>, (StatusCode, String)> {
-    eprintln!("{}", "[ Got a request! ]".green());
+    eprintln!("{}", "[ Got a request to `stats`! ]".green());
 
     // Check if the user is in the session
     let maybe_username = session.get::<String>("username")
@@ -57,7 +57,10 @@ pub async fn stats_handler(
                 .db
                 .get_job_stats(id)
             {
-                Ok(stats) => return Ok(Json(stats)),
+                Ok(stats) => {
+                    eprintln!("{} {:#?}", "[ Final Stats ]:".yellow(), stats);
+                    return Ok(Json(stats))
+                },
                 Err(e) => {
                     return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
