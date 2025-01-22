@@ -18,7 +18,6 @@ RUN nix build .#hawkeye
 # Run the binary
 VOLUME /data
 VOLUME /root/.ssh
-VOLUME /db
 CMD ["/app/result/bin/hawkeye"]
 EXPOSE 5777
 

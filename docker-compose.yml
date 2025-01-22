@@ -1,0 +1,14 @@
+services:
+  socials-test:
+    image: ghcr.io/hiibolt/hawkeye:latest
+    network_mode: "host"
+    ports:
+      - "5777:5777"
+    volumes:
+      - 'data:/data'
+      - 'ssh:/root/.ssh'
+    env_file:
+      - .env
+volumes:
+  data:
+  ssh:
