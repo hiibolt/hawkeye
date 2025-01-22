@@ -6,7 +6,6 @@ use futures::future::join_all;
 use tokio::task::JoinHandle;
 use tokio::sync::Mutex;
 
-use crate::remote;
 use crate::routes::AppState;
 use super::super::remote::command::*;
 
@@ -90,6 +89,9 @@ async fn grab_groups_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
 
 pub async fn groups_daemon ( app: Arc<Mutex<AppState>> ) {
     // Wait for the web server to start up
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
+    // Wait even longer for jobs to be populated
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     loop {

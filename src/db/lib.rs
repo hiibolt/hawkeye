@@ -1,17 +1,10 @@
-use std::{collections::{BTreeMap, HashSet}, sync::Arc};
+use std::collections::{BTreeMap, HashSet};
 
 use anyhow::{Context, Result};
 use rusqlite::{params, Connection};
 use colored::Colorize;
-use tokio::sync::Mutex;
 
-use crate::remote::command::remote_command;
-
-use super::super::{
-    daemons::groups::grab_group_thread,
-    routes::AppState,
-    remote::auth::verify_login,
-};
+use super::super::remote::auth::verify_login;
 
 #[derive(Debug)]
 pub struct DB {
@@ -70,6 +63,7 @@ impl DB {
                 req_select TEXT NOT NULL,
                 mem_efficiency REAL NOT NULL,
                 walltime_efficiency REAL NOT NULL,
+                cpu_efficiency REAL NOT NULL,
                 FOREIGN KEY (owner) REFERENCES Users(owner)
             )",
             [],
@@ -98,7 +92,7 @@ impl DB {
         
         // Add the job
         self.conn.execute(
-            "INSERT OR REPLACE INTO Jobs (pbs_id, name, owner, state, stime, queue, nodes, req_mem, req_cpus, req_gpus, req_walltime, req_select, mem_efficiency, walltime_efficiency) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)",
+            "INSERT OR REPLACE INTO Jobs (pbs_id, name, owner, state, stime, queue, nodes, req_mem, req_cpus, req_gpus, req_walltime, req_select, mem_efficiency, walltime_efficiency, cpu_efficiency) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
             params![
                 job["job_id"],
                 job["Job_Name"],
@@ -114,6 +108,7 @@ impl DB {
                 job["Resource_List.select"],
                 job["mem_efficiency"],
                 job["walltime_efficiency"],
+                job["cpu_efficiency"],
             ],
         )?;
         
@@ -201,6 +196,7 @@ impl DB {
                 ("req_select".to_string(), row.get::<_, String>(11)?),
                 ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
                 ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
+                ("cpu_efficiency".to_string(), row.get::<_, f64>(14)?.to_string()),
             ]))
         }).context("Failed to get rows!")?;
     
@@ -294,6 +290,16 @@ impl DB {
     ) -> Result<Vec<String>> {
         let mut stmt = self.conn.prepare("SELECT name FROM Users")?;
         let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+    
+        Ok(rows.flatten().collect())
+    }
+    
+    pub fn get_user_groups (
+        &mut self,
+        username: &str,
+    ) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT group_name FROM UserGroups WHERE user_name = ?1")?;
+        let rows = stmt.query_map([username], |row| row.get::<_, String>(0))?;
     
         Ok(rows.flatten().collect())
     }

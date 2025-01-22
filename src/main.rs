@@ -9,10 +9,9 @@ use daemons::{jobs::jobs_daemon, groups::groups_daemon};
 use routes::{
     jobs::jobs_handler,
     stats::stats_handler,
-    auth::{login_handler, logout_handler},
+    auth::{login_handler, logout_handler, me_handler},
     AppState
 };
-use remote::auth::verify_login;
 
 use std::sync::Arc;
 
@@ -24,6 +23,8 @@ use axum::{
 use colored::Colorize;
 use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
 use time::Duration;
+use tower_http::cors::CorsLayer;
+use http::{HeaderValue, Method};
 
 
 #[tokio::main]
@@ -55,6 +56,7 @@ async fn main() -> Result<()> {
     let auth_routes = Router::new()
         .route("/login", post(login_handler))
         .route("/logout", post(logout_handler))
+        .route("/me", get(me_handler))
         .with_state(state.clone());
 
     // Build the V1 API router
@@ -64,9 +66,19 @@ async fn main() -> Result<()> {
         .nest("/auth", auth_routes)
         .with_state(state.clone());
 
+    // CORS layer that allows cross-site requests
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_origin(
+            "http://localhost:5500"
+                .parse::<HeaderValue>()
+                .context("Invalid frontend origin!")?)
+        .allow_credentials(true);
+
     // Nest the API into the general app router
     let app = Router::new()
         .nest("/api/v1", api_v1)
+        .layer(cors)
         .layer(session_layer);
 
     // Start the server

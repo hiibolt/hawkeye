@@ -92,6 +92,7 @@ pub fn job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, String>>
             .floor()
             .to_string();
     }
+
     eprintln!("\t{}", "[ Converting Resource List Memory Field... ]".blue());
     if let Some(entry) = entry.get_mut("Resource_List.mem") {
         *entry = (*entry).split("gb")
@@ -99,6 +100,7 @@ pub fn job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, String>>
             .context("Invalid field!")?
             .to_string();
     }
+
     eprintln!("\t{}", "[ Calculating Memory Efficiency... ]".blue());
     let mem_efficiency = 
         convert_mem_to_f64(&entry.get("resources_used.mem")
@@ -117,6 +119,20 @@ pub fn job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, String>>
         &entry["resources_used.walltime"]
     ).map_err(|e| anyhow!("Couldn't calculate walltime efficiency! Error: {e:?}"))?;
     entry.insert("walltime_efficiency", walltime_efficiency.to_string());
+
+    eprintln!("\t{}", "[ Calculating CPU Efficiency... ]".blue());
+    let cpu_efficiency = 
+    ( entry.get("resources_used.cpupercent")
+        .context("Missing field 'resources_used.cpupercent'")?
+        .parse::<f64>()
+        .context("Couldn't parse CPU time!")? )
+        /
+        ( entry.get("Resource_List.ncpus")
+            .context("Missing field 'Resource_List.ncpus'")?
+            .parse::<f64>()
+            .context("Couldn't parse CPU time!")? * 100f64 )
+        * 100f64;
+    entry.insert("cpu_efficiency", cpu_efficiency.to_string());
 
     Ok(entry)
 }
