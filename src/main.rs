@@ -18,12 +18,15 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use tokio::sync::Mutex;
 use axum::{
-    routing::{get, post}, Router
+    response::Html, routing::{get, post}, Router
 };
 use colored::Colorize;
 use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
 use time::Duration;
-use tower_http::cors::CorsLayer;
+use tower_http::{
+    services::ServeDir,
+    cors::CorsLayer
+};
 use http::{HeaderValue, Method};
 
 
@@ -35,6 +38,7 @@ async fn main() -> Result<()> {
         .and_then(|v| Ok(v == "true"))
         .unwrap_or(false)
     {
+        eprintln!("{}", "[ Running in development mode! ]".yellow());
         std::env::var("DEV_FRONTEND_BASEURL")
             .context("Missing `DEV_FRONTEND_BASEURL` environment variable!")?
     } else {
@@ -97,6 +101,11 @@ async fn main() -> Result<()> {
     // Nest the API into the general app router
     let app = Router::new()
         .nest("/api/v1", api_v1)
+        .route("/", get(|| async { Html(std::include_str!("../public/html/index.html")) }))
+        .route("/index.html", get(|| async { Html(std::include_str!("../public/html/index.html")) }))
+        .route("/login.html", get(|| async { Html(std::include_str!("../public/html/login.html")) }))
+        .route("/stats.html", get(|| async { Html(std::include_str!("../public/html/stats.html")) }))
+        .nest_service("/public", ServeDir::new("public"))
         .layer(cors)
         .layer(session_layer);
 

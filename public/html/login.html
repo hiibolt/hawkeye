@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - CRCD Batchmon</title>
+    <link rel="stylesheet" href="public/styles/styles.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="branding">
+            <h2>CRCD Batchmon Login</h2>
+        </div>
+        <form action="api/v1/auth/login" method="POST" class="login-form">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" required>
+            
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+            
+            <button type="submit"><b>Login</b></button>
+        </form>
+        <p class="login-alert" id="alert-footer" style="text-align:center">
+            <!-- Populated by JS -->
+        </p>
+    </div>
+
+    <script src="public/scripts/login.js"></script>
+</body>
+</html>

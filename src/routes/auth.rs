@@ -94,16 +94,10 @@ pub async fn login_handler(
                     eprintln!("{}", format!("Couldn't insert username into session! Error: {e:?}").red());
                     (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't insert username into session!".to_string())
                 })?;
-            // session.insert("groups", groups).await.unwrap();
 
             drop(login_result);
 
-            eprintln!("Redirecting to {}/batchmon/index.html", &app.lock().await.frontend_base);
-            // You can redirect, or return JSON, or some other response
-            Ok(Redirect::to(&format!(
-                "{}/pub/batchmon/index.html",
-                &app.lock().await.frontend_base
-            )))
+            Ok(Redirect::to("/index.html"))
         },
         false => {
             drop(login_result);
@@ -111,10 +105,7 @@ pub async fn login_handler(
             // If not verified or an error, you can respond with an error page/JSON
             // Here we'll just return a plain text error
             eprintln!("{}", "[ Invalid login! ]".red());
-            Ok(Redirect::to(&format!(
-                "{}/pub/batchmon/login.html?invalid=true",
-                &app.lock().await.frontend_base
-            )))
+            Ok(Redirect::to("/login.html?invalid=true"))
         }
     }
 }
