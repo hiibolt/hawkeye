@@ -5,5 +5,6 @@ pub mod auth;
 pub struct AppState {
     pub remote_username: String,
     pub remote_hostname: String,
-    pub db: super::DB
+    pub db: super::DB,
+    pub frontend_base: String
 }

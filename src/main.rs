@@ -29,6 +29,20 @@ use http::{HeaderValue, Method};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Check if we're in development mode,
+    //  and set the frontend base URL accordingly
+    let frontend_base = if std::env::var("DEV_MODE")
+        .and_then(|v| Ok(v == "true"))
+        .unwrap_or(false)
+    {
+        std::env::var("DEV_FRONTEND_BASEURL")
+            .context("Missing `DEV_FRONTEND_BASEURL` environment variable!")?
+    } else {
+        std::env::var("PROD_FRONTEND_BASEURL")
+            .context("Missing `PROD_FRONTEND_BASEURL` environment variable!")?
+    };
+
+    // Create the shared state
     let state: Arc<Mutex<AppState>> = Arc::new(Mutex::new(AppState {
         remote_username: std::env::var("REMOTE_USERNAME")
             .context("Missing `REMOTE_USERNAME` environment variable!")?,
@@ -37,7 +51,8 @@ async fn main() -> Result<()> {
         db: DB::new(
             &std::env::var("DB_PATH")
                 .context("Missing `DB_PATH` environment variable!")?
-        ).context("Failed to establish connection to DB!")?
+        ).context("Failed to establish connection to DB!")?,
+        frontend_base: frontend_base
     }));
     
     eprintln!("{}", "[ Starting daemons... ]".green());
@@ -70,7 +85,7 @@ async fn main() -> Result<()> {
     let cors = CorsLayer::new()
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_origin(
-            "http://localhost:5500"
+            state.lock().await.frontend_base
                 .parse::<HeaderValue>()
                 .context("Invalid frontend origin!")?)
         .allow_credentials(true);

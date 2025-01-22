@@ -62,10 +62,9 @@ pub async fn login_handler(
         (state.remote_username.clone(), state.remote_hostname.clone())
     };
 
-    let db = &mut app.lock()
+    let login_result = app.lock()
         .await
-        .db;
-    let login_result = db
+        .db
         .login(
             &remote_username,
             &remote_hostname,
@@ -97,13 +96,25 @@ pub async fn login_handler(
                 })?;
             // session.insert("groups", groups).await.unwrap();
 
+            drop(login_result);
+
+            eprintln!("Redirecting to {}/batchmon/index.html", &app.lock().await.frontend_base);
             // You can redirect, or return JSON, or some other response
-            Ok(Redirect::to("http://localhost:5500/batchmon/index.html"))
+            Ok(Redirect::to(&format!(
+                "{}/batchmon/index.html",
+                &app.lock().await.frontend_base
+            )))
         },
         false => {
+            drop(login_result);
+
             // If not verified or an error, you can respond with an error page/JSON
             // Here we'll just return a plain text error
-            Ok(Redirect::to("http://localhost:5500/batchmon/login.html?invalid=true"))
+            eprintln!("{}", "[ Invalid login! ]".red());
+            Ok(Redirect::to(&format!(
+                "{}/batchmon/login.html?invalid=true",
+                &app.lock().await.frontend_base
+            )))
         }
     }
 }
