@@ -261,6 +261,7 @@ impl DB {
                 ("req_select".to_string(), row.get::<_, String>(11)?),
                 ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
                 ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
+                ("cpu_efficiency".to_string(), row.get::<_, f64>(14)?.to_string()),
             ]))
         }).context("Failed to get rows!")?;
     

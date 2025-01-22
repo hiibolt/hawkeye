@@ -103,7 +103,7 @@ pub async fn login_handler(
         false => {
             // If not verified or an error, you can respond with an error page/JSON
             // Here we'll just return a plain text error
-            Err((StatusCode::UNAUTHORIZED, "Invalid login!".to_string()))
+            Ok(Redirect::to("http://localhost:5500/batchmon/login.html?invalid=true"))
         }
     }
 }
