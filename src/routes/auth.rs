@@ -101,7 +101,7 @@ pub async fn login_handler(
             eprintln!("Redirecting to {}/batchmon/index.html", &app.lock().await.frontend_base);
             // You can redirect, or return JSON, or some other response
             Ok(Redirect::to(&format!(
-                "{}/batchmon/index.html",
+                "{}/pub/batchmon/index.html",
                 &app.lock().await.frontend_base
             )))
         },
@@ -112,7 +112,7 @@ pub async fn login_handler(
             // Here we'll just return a plain text error
             eprintln!("{}", "[ Invalid login! ]".red());
             Ok(Redirect::to(&format!(
-                "{}/batchmon/login.html?invalid=true",
+                "{}/pub/batchmon/login.html?invalid=true",
                 &app.lock().await.frontend_base
             )))
         }
