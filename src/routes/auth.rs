@@ -79,7 +79,7 @@ pub async fn login_handler(
 
     if login_result.created_new {
         // Launch the groups daemon early
-        tokio::spawn(crate::daemons::groups::groups_daemon(app.clone()));
+        tokio::spawn(crate::daemons::groups::groups_daemon(app.clone(), true));
     }
     
     match login_result.success {

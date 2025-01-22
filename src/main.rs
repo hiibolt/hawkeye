@@ -61,7 +61,7 @@ async fn main() -> Result<()> {
     
     eprintln!("{}", "[ Starting daemons... ]".green());
     tokio::spawn(jobs_daemon(state.clone()));
-    tokio::spawn(groups_daemon(state.clone()));
+    tokio::spawn(groups_daemon(state.clone(), false));
     eprintln!("{}", "[ Daemons started! ]".green());
 
     // Create the Session store and layer

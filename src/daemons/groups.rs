@@ -87,7 +87,10 @@ async fn grab_groups_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
     Ok(())
 }
 
-pub async fn groups_daemon ( app: Arc<Mutex<AppState>> ) {
+pub async fn groups_daemon (
+    app: Arc<Mutex<AppState>>,
+    run_once: bool
+) {
     // Wait for the web server to start up
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
@@ -103,6 +106,10 @@ pub async fn groups_daemon ( app: Arc<Mutex<AppState>> ) {
             continue;
         };
         eprintln!("{}", "[ Groups pulled! ]".green());
+
+        if run_once {
+            break;
+        }
 
         tokio::time::sleep(tokio::time::Duration::from_secs(GROUPS_PERIOD)).await;
     }
