@@ -1,5 +1,5 @@
 services:
-  socials-test:
+  hawkeye:
     image: ghcr.io/hiibolt/hawkeye:latest
     network_mode: "host"
     ports:
