@@ -82,7 +82,7 @@ pub async fn login_handler(
         // Launch the groups daemon early
         tokio::spawn(crate::daemons::groups::groups_daemon(app.clone()));
     }
-        
+    
     match login_result.success {
         true => {
             // Store relevant info in the session (username, group(s), etc.)
@@ -98,7 +98,7 @@ pub async fn login_handler(
             // session.insert("groups", groups).await.unwrap();
 
             // You can redirect, or return JSON, or some other response
-            Ok(Redirect::to("/api/v1/jobs"))
+            Ok(Redirect::to("http://localhost:5500/batchmon/index.html"))
         },
         false => {
             // If not verified or an error, you can respond with an error page/JSON
@@ -110,11 +110,11 @@ pub async fn login_handler(
 
 pub async fn logout_handler(
     session: Session,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<(), (StatusCode, String)> {
     // Clear the entire session
     match session.delete().await {
         Ok(_) => {
-            Ok(Redirect::to("/api/v1/jobs"))
+            Ok(())
         },
         Err(_) => {
             Err((

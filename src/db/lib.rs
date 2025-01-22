@@ -224,17 +224,7 @@ impl DB {
                 ("req_select".to_string(), row.get::<_, String>(11)?),
                 ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
                 ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
-                ("state".to_string(), row.get::<_, String>(3)?),
-                ("stime".to_string(), row.get::<_, String>(4)?),
-                ("queue".to_string(), row.get::<_, String>(5)?),
-                ("nodes".to_string(), row.get::<_, String>(6)?),
-                ("req_mem".to_string(), row.get::<_, f64>(7)?.to_string()),
-                ("req_cpus".to_string(), row.get::<_, i32>(8)?.to_string()),
-                ("req_gpus".to_string(), row.get::<_, i32>(9)?.to_string()),
-                ("req_walltime".to_string(), row.get::<_, String>(10)?),
-                ("req_select".to_string(), row.get::<_, String>(11)?),
-                ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
-                ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
+                ("cpu_efficiency".to_string(), row.get::<_, f64>(14)?.to_string()),
             ]))
         }).context("Failed to get rows!")?;
     
