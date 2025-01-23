@@ -134,7 +134,7 @@ function createJobRow (job, index) {
             <p>
                 <b>${job.name} - ${job.pbs_id} (${job.state})</b>
                 <br>
-                Submitted by <a href="index.html?user=${job.owner}">${job.owner}</a> on <b>${job.stime}</b>
+                Submitted by <a href="index.html?user=${job.owner}">${job.owner}</a> on <b>${new Date(parseInt(job.start_time)*1000).toLocaleString()}</b>
             </p>
         </div>
 
@@ -198,6 +198,7 @@ async function build_jobs ( ) {
     let state = url.searchParams.get('state');
     let queue = url.searchParams.get('queue');
     let name = url.searchParams.get('name');
+    let date = url.searchParams.get('date');
 
     let additional_filters = '';
     if ( owner ) {
@@ -211,6 +212,9 @@ async function build_jobs ( ) {
     }
     if ( name ) {
         additional_filters += `&name=${name}`;
+    }
+    if ( date ) {
+        additional_filters += `&date=${date}`;
     }
     console.log(`Additional filters: ${additional_filters}`);
 
@@ -303,10 +307,122 @@ async function build_section_header ( ) {
     } else {
         header.innerHTML = `All Running Jobs on Metis`;
     }
+
+    // Get all filters
+    let owner = url.searchParams.get('owner');
+    let state = url.searchParams.get('state');
+    let queue = url.searchParams.get('queue');
+    let name = url.searchParams.get('name');
+    let date = url.searchParams.get('date');
+
+    // Add filters to the header
+    let filters = [];
+    if ( owner ) { filters.push(`Owner: ${owner}`); }
+    if ( state ) { filters.push(`State: ${state}`); }
+    if ( queue ) { filters.push(`Queue: ${queue}`); }
+    if ( name ) { filters.push(`Name: ${name}`); }
+    if ( date ) { filters.push(`Date: ${new Date(parseInt(date)*1000).toLocaleString()}`); }
+
+    if ( filters.length > 0 ) {
+        header.innerHTML += `- Filters - ${filters.join(', ')}`;
+    }
+
     header.style.visibility = 'visible';
+}
+
+async function build_filter_section ( ) {
+    console.log('Document is ready!');
+
+    // Add the following element to the navbar:
+    const filter_container = document.createElement('div');
+    filter_container.className = 'filter-container';
+    filter_container.id = 'filter-container';
+    filter_container.style.visibility = 'hidden';
+    filter_container.innerHTML = `
+    <h3>Filters</h3>
+    <input type="text" id="owner" placeholder="Owner" />
+    <input type="text" id="queue" placeholder="Queue" />
+    <input type="text" id="state" placeholder="State" />
+    <input type="text" id="name" placeholder="Job Name" />
+
+    <div>
+    <label for="date-dropdown"><b>Date:</b></label>
+    <select id="date-dropdown">
+        <option value="all">All</option>
+        <option value="day">Day</option>
+        <option value="month">Month</option>
+        <option value="year">Year</option>
+    </select>
+    </div>
+
+    <br>
+
+    <button id="search-button">Search</button>
+    `;
+
+    document.getElementById('navbar').appendChild(filter_container);
+
+    // Set all of the example HTML items to their respective values
+    //  if they are present in the query parameters
+    const url = new URL(window.location.href);
+    const owner = url.searchParams.get('owner');
+    const queue = url.searchParams.get('queue');
+    const state = url.searchParams.get('state');
+    const name = url.searchParams.get('name');
+
+    if (owner) document.getElementById('owner').value = owner;
+    if (queue) document.getElementById('queue').value = queue;
+    if (state) document.getElementById('state').value = state;
+    if (name) document.getElementById('name').value = name;
+
+    // Show the filter container (ID `filter-container`)
+    if ( username ) {
+        console.log("Showing filter container");
+        document.getElementById('filter-container').style.visibility = 'visible';
+    }
+
+    document.getElementById('search-button').addEventListener('click', () => {
+        console.log('Search button clicked');
+
+        const owner = document.getElementById('owner').value;
+        const queue = document.getElementById('queue').value;
+        const state = document.getElementById('state').value;
+        const name = document.getElementById('name').value;
+        const dateOption = document.getElementById('date-dropdown').value;
+
+        // Construct the new URL with filters
+        let url = new URL(window.location.href);
+        if (owner) url.searchParams.set('owner', owner);
+        if (queue) url.searchParams.set('queue', queue);
+        if (state) url.searchParams.set('state', state);
+        if (name) url.searchParams.set('name', name);
+
+        // Handle date selection
+        const now = new Date();
+        let dateParam;
+        switch (dateOption) {
+            case 'day':
+                dateParam = Math.floor(now.setHours(0, 0, 0, 0) / 1000);
+                break;
+            case 'month':
+                dateParam = Math.floor(new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000);
+                break;
+            case 'year':
+                dateParam = Math.floor(new Date(now.getFullYear(), 0, 1).getTime() / 1000);
+                break;
+            case 'all':
+                dateParam = null; // No date filter
+                break;
+        }
+        if (dateParam !== null) url.searchParams.set('date', dateParam);
+
+        // Reload the page with the new query parameters
+        window.location.href = url.toString();
+    });
 }
 
 build_navbar()
     .then(() => build_section_header())
     .then(() => build_auth())
-    .then(() => build_jobs());
+    .then(() => build_jobs())
+    .then(() => build_filter_section());

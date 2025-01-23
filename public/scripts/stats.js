@@ -236,7 +236,11 @@ async function build_job ( ) {
     let end_time_entry = "";
     if ( job.end_time ) {
         end_time_header = "<th>End Time</th>";
-        end_time_entry = `<td>${job.end_time}</td>`;
+        if ( job.end_time == "2147483647" ) {
+            end_time_entry = `<td>Not Ended</td>`;
+        } else {
+            end_time_entry = `<td>${new Date(parseInt(job.end_time)*1000).toLocaleString()}</td>`;
+        }
     }
     let used_mem_per_core = parseFloat(job.used_mem) / parseFloat(job.req_cpus);
 
@@ -266,7 +270,7 @@ async function build_job ( ) {
         <p>
             <b>${job.name} - ${job.pbs_id} (${job.state})</b>
             <br>
-            Submitted by <a href="index.html?user=${job.owner}">${job.owner}</a> on <b>${job.stime}</b>
+            Submitted by <a href="index.html?user=${job.owner}">${job.owner}</a> on <b>${new Date(parseInt(job.start_time)*1000).toLocaleString()}</b>
         </p>
     </div>
 

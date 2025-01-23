@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use anyhow::{Context, Result, bail, anyhow};
+use chrono::{DateTime, Utc};
 use colored::Colorize;
 
 pub fn convert_mem_to_f64 ( st: &str ) -> Result<f64> {
@@ -24,6 +25,30 @@ pub fn convert_mem_to_f64 ( st: &str ) -> Result<f64> {
     } else {
         bail!("Recieved unusual memory input!");
     }
+}
+
+pub fn date_to_unix_timestamp(date_str: &str) -> Result<u32, String> {
+    // Define the input date format
+    let format = "%a %b %d %H:%M:%S %Y %z";
+
+    // Parse the input string into a DateTime<Utc>
+    let datetime = match DateTime::parse_from_str(
+        &format!("{} {}", date_str, "+0000"),
+        format
+    ) {
+        Ok(dt) => dt.with_timezone(&Utc),
+        Err(e) => return Err(format!("Failed to parse date: {}", e)),
+    };
+
+    // Convert the DateTime<Utc> to a UNIX timestamp
+    let timestamp = datetime.timestamp();
+
+    // Ensure the timestamp is within the range of u32
+    if timestamp < 0 {
+        return Err("Timestamp is negative, cannot fit into u32".to_string());
+    }
+
+    Ok(timestamp as u32)
 }
 
 pub fn walltime_to_percentage(reserved: &str, used: &str) -> Result<f64, String> {
@@ -57,12 +82,6 @@ pub fn jmanl_job_str_to_btree<'a>(
     //eprintln!("\n{}\n{job}", "[ Looking at the following job ]".green());
 
     entry.insert(
-        "stime".to_string(),
-        prelim.get(0)
-            .context("Invalid field!")?
-            .to_string()
-    );
-    entry.insert(
         "job_state".to_string(),
         prelim.get(1)
             .context("Invalid field!")?
@@ -90,6 +109,10 @@ pub fn jmanl_job_str_to_btree<'a>(
             .join("=");
         //eprintln!("\t{}\n{name} - {value} - {ind}", "[ Got Field ]".green());
 
+        if name == "start" {
+            entry.insert("start_time".to_string(), value.to_string());
+            continue;
+        }
         if name == "user" {
             entry.insert("Job_Owner".to_string(), value.to_string());
             continue;
@@ -143,16 +166,12 @@ pub fn jmanl_job_str_to_btree<'a>(
         entry.insert("Nodes".to_string(), nodes.to_string());
     }
 
-    eprintln!("\t{}", "[ Converting UNIX End Timestamp to Human Readable... ]".blue());
-    let datetime = chrono::DateTime::from_timestamp(
-        entry.get("end")
-            .context("Missing field 'end'")?
-            .parse::<i64>()
-            .context("Couldn't parse UNIX timestamp!")?,
-        0
-    ).context("Couldn't convert UNIX timestamp to DateTime!")?;
-    let formatted_datetime = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
-    entry.insert("end_time".to_string(), formatted_datetime);
+    eprintln!("\t{}", "[ Adding UNIX End Timestamp... ]".blue());
+    entry.insert("end_time".to_string(), entry.get("end")
+        .context("Missing field 'end'")?
+        .parse::<i64>()
+        .context("Couldn't parse UNIX timestamp!")?
+        .to_string());
 
     eprintln!("\t{}", "[ Calculating Walltime Efficiency... ]".blue());
     let walltime_efficiency = walltime_to_percentage(
@@ -189,6 +208,9 @@ pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, 
             eprintln!("label - {ind} - {field}");
             continue;
         }
+        if field.starts_with("nodes: ") {
+            continue;
+        }
 
         let field = field.trim_ascii_start();
         //eprintln!("\t{}\n{field} - {ind} - {field}", "[ Analyzing Field ]".green());
@@ -198,6 +220,15 @@ pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, 
         let value = field.split(" = ")
             .nth(1)
             .context("Invalid field!")?;
+
+        if name == "stime" {
+            // Convert the start time to a UNIX timestamp
+            eprintln!("label - {ind} - {field}");
+            let timestamp = date_to_unix_timestamp(value)
+                .map_err(|e| anyhow!("Couldn't convert start time to UNIX timestamp! Error: {e:?}"))?;
+            entry.insert("start_time", timestamp.to_string());
+            continue;
+        }
 
         if name == "Job_Owner" {
             eprintln!("\t{}", "[ Reformatting Job Owner... ]".blue());

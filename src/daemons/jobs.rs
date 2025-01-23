@@ -48,7 +48,7 @@ pub async fn grab_old_jobs_thread (
             ) {
                 Ok(job) => Some(job),
                 Err(e) => {
-                    eprintln!("{}", format!("Couldn't parse job line: {job_line}! Error: {e:?}").red());
+                    eprintln!("{}", format!("Couldn't parse `jmanl` job line: {job_line}! Error: {e:?}").red());
                     None
                 }
             }
@@ -166,7 +166,15 @@ async fn grab_jobs_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
         .collect();
 
     let jobs = job_strs.iter()
-        .flat_map(|job| jobstat_job_str_to_btree(job))
+        .flat_map(|job| {
+            match jobstat_job_str_to_btree(job) {
+                Ok(job) => Some(job),
+                Err(e) => {
+                    eprintln!("{}", format!("Couldn't parse `jobstat` job line: {job}! Error: {e:?}").red());
+                    None
+                }
+            }
+        })
         .collect::<Vec<BTreeMap<&str, String>>>();
 
     for job in jobs.iter() {

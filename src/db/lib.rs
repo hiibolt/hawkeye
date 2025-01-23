@@ -54,7 +54,7 @@ impl DB {
                 name TEXT NOT NULL,
                 owner TEXT NOT NULL,
                 state TEXT NOT NULL,
-                stime TEXT NOT NULL,
+                start_time INTEGER NOT NULL,
                 queue TEXT NOT NULL,
                 nodes TEXT NOT NULL,
                 req_mem REAL NOT NULL,
@@ -68,7 +68,7 @@ impl DB {
                 used_cpu_percent REAL NOT NULL,
                 used_mem REAL NOT NULL,
                 used_walltime TEXT NOT NULL,
-                end_time TEXT NOT NULL,
+                end_time INTEGER NOT NULL,
                 FOREIGN KEY (owner) REFERENCES Users(owner)
             )",
             [],
@@ -98,13 +98,13 @@ impl DB {
         
         // Add the job
         self.conn.execute(
-            "INSERT OR REPLACE INTO Jobs (pbs_id, name, owner, state, stime, queue, nodes, req_mem, req_cpus, req_gpus, req_walltime, req_select, mem_efficiency, walltime_efficiency, cpu_efficiency, used_cpu_percent, used_mem, used_walltime, end_time) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+            "INSERT OR REPLACE INTO Jobs (pbs_id, name, owner, state, start_time, queue, nodes, req_mem, req_cpus, req_gpus, req_walltime, req_select, mem_efficiency, walltime_efficiency, cpu_efficiency, used_cpu_percent, used_mem, used_walltime, end_time) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
             params![
                 job["job_id"],
                 job["Job_Name"],
                 job["Job_Owner"],
                 job["job_state"],
-                job["stime"],
+                job["start_time"],
                 job["queue"],
                 job["Nodes"],
                 job["Resource_List.mem"],
@@ -118,7 +118,7 @@ impl DB {
                 job["resources_used.cpupercent"],
                 job["resources_used.mem"],
                 job["resources_used.walltime"],
-                job.get("end_time").unwrap_or(&String::from("not_ended")),
+                job.get("end_time").unwrap_or(&i32::MAX.to_string()),
             ],
         )?;
         
@@ -183,10 +183,9 @@ impl DB {
                 eprintln!("{}", format!("[ Marking job {} as completed... ]", pbs_id).green());
 
                 let now = SystemTime::now();
-                let duration_since_epoch = now.duration_since(UNIX_EPOCH)
-                    .context("Time went backwards")?;
-                let datetime = DateTime::<Utc>::from(UNIX_EPOCH + duration_since_epoch);
-                let formatted_datetime = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+                let secs_since_epoch = now.duration_since(UNIX_EPOCH)
+                    .context("Time went backwards")?
+                    .as_secs();
 
                 self.conn.execute(
                     "UPDATE Jobs SET state = 'E' WHERE pbs_id = ?1",
@@ -195,7 +194,7 @@ impl DB {
 
                 self.conn.execute(
                     "UPDATE Jobs SET end_time = ?1 WHERE pbs_id = ?2",
-                    [formatted_datetime, pbs_id.to_string()],
+                    [secs_since_epoch.to_string(), pbs_id.to_string()],
                 )?;
             }
         }
@@ -210,6 +209,7 @@ impl DB {
         filter_queue: Option<&String>,
         filter_owner: Option<&String>,
         filter_name: Option<&String>,
+        filter_date: Option<&String>
     ) -> Result<Vec<BTreeMap<String, String>>> {
         let mut additional_filters= String::new();
         let mut params = vec![username.to_string()];
@@ -229,6 +229,12 @@ impl DB {
             additional_filters.push_str(&format!(" AND name = ?{}", params.len() + 1));
             params.push(filter_name.to_owned());
         }
+        // Make sure that the job is before or on the specified date
+        if let Some(filter_date) = filter_date {
+            eprintln!("{}", format!("Filtering by date: {filter_date}").green());
+            additional_filters.push_str(&format!(" AND start_time >= ?{}", params.len() + 1));
+            params.push(filter_date.to_owned());
+        }
 
         let mut stmt = self.conn.prepare(&format!("SELECT * FROM Jobs WHERE owner = ?1{}", additional_filters))?;
         let rows = stmt.query_map(params_from_iter(params), |row| {
@@ -237,7 +243,7 @@ impl DB {
                 ("name".to_string(), row.get::<_, String>(1)?),
                 ("owner".to_string(), row.get::<_, String>(2)?),
                 ("state".to_string(), row.get::<_, String>(3)?),
-                ("stime".to_string(), row.get::<_, String>(4)?),
+                ("start_time".to_string(), row.get::<_, i32>(4)?.to_string()),
                 ("queue".to_string(), row.get::<_, String>(5)?),
                 ("nodes".to_string(), row.get::<_, String>(6)?),
                 ("req_mem".to_string(), row.get::<_, f64>(7)?.to_string()),
@@ -251,7 +257,7 @@ impl DB {
                 ("used_cpu_percent".to_string(), row.get::<_, f64>(15)?.to_string()),
                 ("used_mem".to_string(), row.get::<_, f64>(16)?.to_string()),
                 ("used_walltime".to_string(), row.get::<_, String>(17)?),
-                ("end_time".to_string(), row.get::<_, String>(18)?),
+                ("end_time".to_string(), row.get::<_, i32>(18)?.to_string()),
             ]))
         }).context("Failed to get rows!")?;
     
@@ -264,6 +270,7 @@ impl DB {
         filter_queue: Option<&String>,
         filter_owner: Option<&String>,
         filter_name: Option<&String>,
+        filter_date: Option<&String>,
         censor: bool
     ) -> Result<Vec<BTreeMap<String, String>>> {
         let mut additional_filters= String::new();
@@ -286,7 +293,14 @@ impl DB {
             additional_filters.push_str(&format!(" AND name = ?{}", params.len() + 1));
             params.push(filter_name);
         }
-        //  ORDER BY stime DESC
+        // Make sure that the job is before or on the specified date
+        if let Some(filter_date) = filter_date {
+            eprintln!("{}", format!("Filtering by date: {filter_date}").green());
+            additional_filters.push_str(&format!(" AND start_time >= ?{}", params.len() + 1));
+            params.push(filter_date);
+        }
+
+        //  ORDER BY start_time DESC
         let mut stmt = self.conn.prepare(&format!("SELECT * FROM Jobs WHERE {}", additional_filters))?;
         let rows = stmt.query_map(params_from_iter(params), |row| {
             Ok(BTreeMap::from_iter(vec![
@@ -294,7 +308,7 @@ impl DB {
                 ("name".to_string(), row.get::<_, String>(1)?),
                 ("owner".to_string(), if censor { "REDACTED".to_string() } else { row.get::<_, String>(2)? }),
                 ("state".to_string(), row.get::<_, String>(3)?),
-                ("stime".to_string(), row.get::<_, String>(4)?),
+                ("start_time".to_string(), row.get::<_, i32>(4)?.to_string()),
                 ("queue".to_string(), row.get::<_, String>(5)?),
                 ("nodes".to_string(), row.get::<_, String>(6)?),
                 ("req_mem".to_string(), row.get::<_, f64>(7)?.to_string()),
@@ -308,7 +322,7 @@ impl DB {
                 ("used_cpu_percent".to_string(), row.get::<_, f64>(15)?.to_string()),
                 ("used_mem".to_string(), row.get::<_, f64>(16)?.to_string()),
                 ("used_walltime".to_string(), row.get::<_, String>(17)?),
-                ("end_time".to_string(), row.get::<_, String>(18)?),
+                ("end_time".to_string(), row.get::<_, i32>(18)?.to_string()),
             ]))
         });
 
@@ -327,6 +341,7 @@ impl DB {
         filter_queue: Option<&String>,
         filter_owner: Option<&String>,
         filter_name: Option<&String>,
+        filter_date: Option<&String>,
         group: &str
     ) -> Result<Vec<BTreeMap<String, String>>> {
         let mut additional_filters= String::new();
@@ -347,6 +362,16 @@ impl DB {
             additional_filters.push_str(&format!(" AND name = ?{}", params.len() + 1));
             params.push(filter_name.to_owned());
         }
+        // Make sure that the job is before or on the specified date
+        if let Some(filter_date) = filter_date {
+            eprintln!("{}", format!("Filtering by date: {filter_date}").green());
+            additional_filters.push_str(&format!(" AND start_time >= ?{}", params.len() + 1));
+            params.push(filter_date.to_owned());
+        }
+
+        eprintln!("{}", format!("Filtering by group: {group}").green());
+        eprintln!("{}", format!("Additional filters: '{additional_filters}'").green());
+        eprintln!("{}", format!("Params: {params:?}").green());
 
         let mut stmt = self.conn.prepare(&format!("SELECT * FROM Jobs WHERE owner IN (SELECT user_name FROM UserGroups WHERE group_name = ?1){}", additional_filters))?;
         let rows = stmt.query_map(params_from_iter(params), |row| {
@@ -355,7 +380,7 @@ impl DB {
                 ("name".to_string(), row.get::<_, String>(1)?),
                 ("owner".to_string(), row.get::<_, String>(2)?),
                 ("state".to_string(), row.get::<_, String>(3)?),
-                ("stime".to_string(), row.get::<_, String>(4)?),
+                ("start_time".to_string(), row.get::<_, i32>(4)?.to_string()),
                 ("queue".to_string(), row.get::<_, String>(5)?),
                 ("nodes".to_string(), row.get::<_, String>(6)?),
                 ("req_mem".to_string(), row.get::<_, f64>(7)?.to_string()),
@@ -369,11 +394,21 @@ impl DB {
                 ("used_cpu_percent".to_string(), row.get::<_, f64>(15)?.to_string()),
                 ("used_mem".to_string(), row.get::<_, f64>(16)?.to_string()),
                 ("used_walltime".to_string(), row.get::<_, String>(17)?),
-                ("end_time".to_string(), row.get::<_, String>(18)?),
+                ("end_time".to_string(), row.get::<_, i32>(18)?.to_string()),
             ]))
-        }).context("Failed to get rows!")?;
+        });
     
-        Ok(rows.flatten().collect())
+        match rows {
+            Ok(rows) => {
+                let ret: Vec<BTreeMap<String, String>> = rows.flatten().collect();
+                eprintln!("{}", format!("Returning {} rows!", ret.len()).green());
+                Ok(ret)
+            },
+            Err(e) => {
+                eprintln!("{}", format!("Failed to get rows! Error: {e:?}").red());
+                Err(anyhow!("Failed to get rows! Error: {e:?}"))
+            }
+        }
     }
 
     pub fn get_job_stats (

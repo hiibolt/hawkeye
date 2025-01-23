@@ -310,3 +310,48 @@ header {
     color: white;
     font-size: 10px;
 }
+
+/* Must also center the form elements */
+.filter-container {
+    display: flex;
+    flex-direction: column; /* Arrange items in a column */
+    align-items: center; /* Center items horizontally */
+    justify-content: center; /* Center items vertically */
+}
+.filter-container, .sort-container {
+    width: 100%;
+    margin-top: 20px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+
+.filter-container h3, .sort-container h3 {
+    font-size: 1.2em;
+    margin: 0 0 10px;
+    text-align: center;
+}
+
+.filter-container input, .sort-container select {
+    width: calc(100% - 20px); /* Full width minus padding */
+    padding: 10px;
+    margin: 5px 0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+#search-button {
+    background-color: #A40000; /* NIU Red */
+    color: white;
+    border: none;
+    padding: 10px;
+    margin-top: 20px;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s, transform 0.2s; /* Smooth transitions */
+}
+#search-button:hover {
+    background-color: #900000; /* Darker shade of NIU Red on hover */
+    transform: translateY(-2px); /* Slight lift effect */
+}

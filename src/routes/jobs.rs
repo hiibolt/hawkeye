@@ -21,6 +21,7 @@ pub async fn jobs_handler(
     let filter_queue = params.get("queue");
     let filter_owner = params.get("owner");
     let filter_name = params.get("name");
+    let filter_date = params.get("date");
 
     // Check if the user is in the session
     let maybe_username = session.get::<String>("username")
@@ -41,9 +42,10 @@ pub async fn jobs_handler(
             .db
             .get_all_running_jobs(
                 None,
-                filter_queue,
                 None,
-                filter_name,
+                None,
+                None,
+                None,
                 true
             )
         {
@@ -93,7 +95,8 @@ pub async fn jobs_handler(
                     filter_state,
                     filter_queue,
                     filter_owner,
-                    filter_name
+                    filter_name,
+                    filter_date
                 )
             {
                 Ok(jobs) => return Ok(Json(jobs)),
@@ -136,6 +139,7 @@ pub async fn jobs_handler(
                 filter_queue,
                 filter_owner,
                 filter_name,
+                filter_date,
                 group
             )
         {
@@ -158,6 +162,7 @@ pub async fn jobs_handler(
             filter_queue,
             if is_admin { filter_owner } else { None },
             filter_name,
+            filter_date,
             !is_admin
         )
     {
