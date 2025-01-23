@@ -232,6 +232,29 @@ async function build_job ( ) {
         alert_footer.innerHTML = `An error occurred while fetching jobs for user '${user}'!<br>Error: ${err}`;
         return;
     }
+    let end_time_header = "";
+    let end_time_entry = "";
+    if ( job.end_time ) {
+        end_time_header = "<th>End Time</th>";
+        end_time_entry = `<td>${job.end_time}</td>`;
+    }
+    let used_mem_per_core = parseFloat(job.used_mem) / parseFloat(job.req_cpus);
+
+    // If there are 1 or fewer stats in either the CPU or memory,
+    //  generate an error message
+    let error_message = "";
+    if ( stats.length <= 1 ) {
+        error_message = `
+        <div class="error-message">
+            <p>
+                <b>Insufficient Data</b>
+                <br>
+                There is insufficient data to generate the CPU and memory usage charts.
+                This could be because the job was just submitted, and the stats have not been collected yet.
+            </p>
+        </div>
+        `;
+    }
 
     console.dir(job);
     console.dir(stats);
@@ -255,6 +278,7 @@ async function build_job ( ) {
                 <th># of CPUs</th>
                 <th># of GPUs</th>
                 <th>Memory</th>
+                ${end_time_header}
             </tr>
         </thead>
         <tbody>
@@ -264,6 +288,27 @@ async function build_job ( ) {
                 <td>${job.req_cpus}</td>
                 <td>${job.req_gpus | 0}</td>
                 <td>${job.req_mem}GB</td>
+                ${end_time_entry}
+            </tr>
+        </tbody>
+        <thead>
+            <tr>
+                <th></th>
+                <th>Used CPU</th>
+                <th>Used Mem</th>
+                <th>Used Mem/CPU</th>
+                <th>Used Walltime</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td></td>
+                <td>${job.used_cpu_percent}%</td>
+                <td>${job.used_mem}GB</td>
+                <td>${used_mem_per_core.toFixed(2)}GB</td>
+                <td>${job.used_walltime}</td>
+                <td></td>
             </tr>
         </tbody>
     </table>
@@ -292,10 +337,13 @@ async function build_job ( ) {
     </div>
     <canvas id="cpuChart" width="400" height="200"></canvas>
     <canvas id="memChart" width="400" height="200"></canvas>
+    ${error_message}
     `;
     job_card.style.visibility = 'visible';
 
-    renderCharts(stats);
+    if ( stats.length > 1 ) {
+        renderCharts(stats);
+    }
 }
 
 // Checks what the query type is, and adjusts the `job-section-header`

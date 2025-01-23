@@ -12,7 +12,7 @@ pub async fn jobs_handler(
     Query(params): Query<HashMap<String, String>>,
     session: Session,
 ) -> Result<Json<Vec<BTreeMap<String, String>>>, (StatusCode, String)> {
-    eprintln!("{}", "[ Got a request! ]".green());
+    eprintln!("{}", "[ Got a `jobs` request! ]".green());
 
     // Check if the user is in the session
     let maybe_username = session.get::<String>("username")
@@ -35,20 +35,24 @@ pub async fn jobs_handler(
         {
             Ok(jobs) => {
                 if params.get("user").is_some() {
+                    eprintln!("\t{}", "[ Not authorized to see someone else's jobs without logging in! ]".red());
                     Err((
                         StatusCode::UNAUTHORIZED,
                         "Not authorized to see someone else's jobs without logging in!".to_string()
                     ))
                 } else if params.get("group").is_some() {
+                    eprintln!("\t{}", "[ Not authorized to see group jobs without logging in! ]".red());
                     Err((
                         StatusCode::UNAUTHORIZED,
                         "Not authorized to see group jobs without logging in!".to_string()
                     ))
                 } else {
+                    eprintln!("\t{}", "[ Showing all jobs! ]".green());
                     Ok(Json(jobs))
                 }
             },
             Err(e) => {
+                eprintln!("{}", format!("Couldn't get all jobs! Error: {e:?}").red());
                 Err((
                     StatusCode::INTERNAL_SERVER_ERROR,
                     format!("Couldn't get all jobs! Error: {e:?}")

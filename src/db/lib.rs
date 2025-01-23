@@ -1,7 +1,7 @@
 use std::{collections::{BTreeMap, HashSet}, time::{SystemTime, UNIX_EPOCH}};
 use chrono::{DateTime, Utc};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use rusqlite::{params, Connection};
 use colored::Colorize;
 
@@ -65,7 +65,10 @@ impl DB {
                 mem_efficiency REAL NOT NULL,
                 walltime_efficiency REAL NOT NULL,
                 cpu_efficiency REAL NOT NULL,
-                end_time TEXT,
+                used_cpu_percent REAL NOT NULL,
+                used_mem REAL NOT NULL,
+                used_walltime TEXT NOT NULL,
+                end_time TEXT NOT NULL,
                 FOREIGN KEY (owner) REFERENCES Users(owner)
             )",
             [],
@@ -95,7 +98,7 @@ impl DB {
         
         // Add the job
         self.conn.execute(
-            "INSERT OR REPLACE INTO Jobs (pbs_id, name, owner, state, stime, queue, nodes, req_mem, req_cpus, req_gpus, req_walltime, req_select, mem_efficiency, walltime_efficiency, cpu_efficiency, end_time) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+            "INSERT OR REPLACE INTO Jobs (pbs_id, name, owner, state, stime, queue, nodes, req_mem, req_cpus, req_gpus, req_walltime, req_select, mem_efficiency, walltime_efficiency, cpu_efficiency, used_cpu_percent, used_mem, used_walltime, end_time) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
             params![
                 job["job_id"],
                 job["Job_Name"],
@@ -112,6 +115,9 @@ impl DB {
                 job["mem_efficiency"],
                 job["walltime_efficiency"],
                 job["cpu_efficiency"],
+                job["resources_used.cpupercent"],
+                job["resources_used.mem"],
+                job["resources_used.walltime"],
                 job.get("end_time").unwrap_or(&String::from("not_ended")),
             ],
         )?;
@@ -219,7 +225,10 @@ impl DB {
                 ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
                 ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
                 ("cpu_efficiency".to_string(), row.get::<_, f64>(14)?.to_string()),
-                ("end_time".to_string(), row.get::<_, String>(15)?),
+                ("used_cpu_percent".to_string(), row.get::<_, f64>(15)?.to_string()),
+                ("used_mem".to_string(), row.get::<_, f64>(16)?.to_string()),
+                ("used_walltime".to_string(), row.get::<_, String>(17)?),
+                ("end_time".to_string(), row.get::<_, String>(18)?),
             ]))
         }).context("Failed to get rows!")?;
     
@@ -248,11 +257,20 @@ impl DB {
                 ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
                 ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
                 ("cpu_efficiency".to_string(), row.get::<_, f64>(14)?.to_string()),
-                ("end_time".to_string(), row.get::<_, String>(15)?),
+                ("used_cpu_percent".to_string(), row.get::<_, f64>(15)?.to_string()),
+                ("used_mem".to_string(), row.get::<_, f64>(16)?.to_string()),
+                ("used_walltime".to_string(), row.get::<_, String>(17)?),
+                ("end_time".to_string(), row.get::<_, String>(18)?),
             ]))
-        }).context("Failed to get rows!")?;
-    
-        Ok(rows.flatten().collect())
+        });
+
+        match rows {
+            Ok(rows) => Ok(rows.flatten().collect()),
+            Err(e) => {
+                eprintln!("{}", format!("Failed to get rows! Error: {e:?}").red());
+                Err(anyhow!("Failed to get rows! Error: {e:?}"))
+            }
+        }
     }
 
     pub fn get_group_jobs (
@@ -277,7 +295,10 @@ impl DB {
                 ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
                 ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
                 ("cpu_efficiency".to_string(), row.get::<_, f64>(14)?.to_string()),
-                ("end_time".to_string(), row.get::<_, String>(15)?),
+                ("used_cpu_percent".to_string(), row.get::<_, f64>(15)?.to_string()),
+                ("used_mem".to_string(), row.get::<_, f64>(16)?.to_string()),
+                ("used_walltime".to_string(), row.get::<_, String>(17)?),
+                ("end_time".to_string(), row.get::<_, String>(18)?),
             ]))
         }).context("Failed to get rows!")?;
     

@@ -122,6 +122,9 @@ pub async fn old_jobs_daemon (
         .expect("Invalid `OLD_JOBS_DAEMON_PERIOD` value!");
     eprintln!("{}", format!("[ Old job period: {old_job_period} ]").blue());
 
+    // Wait for the web server to start up
+    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
     loop {
         eprintln!("{}", "[ Pulling old jobs... ]".green());
         if let Err(e) = grab_old_jobs_helper( app.clone() ).await {

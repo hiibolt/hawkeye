@@ -54,7 +54,7 @@ pub fn jmanl_job_str_to_btree<'a>(
 ) -> Result<BTreeMap<String, String>> {
     let mut entry = BTreeMap::new();
 
-    eprintln!("\n{}\n{job}", "[ Looking at the following job ]".green());
+    //eprintln!("\n{}\n{job}", "[ Looking at the following job ]".green());
 
     entry.insert(
         "stime".to_string(),
@@ -78,9 +78,9 @@ pub fn jmanl_job_str_to_btree<'a>(
             .to_string()
     );
 
-    for (ind, field) in job.split_ascii_whitespace().enumerate() {
+    for field in job.split_ascii_whitespace() {
         let field = field.trim_ascii_start();
-        eprintln!("\t{}\n{field} - {ind}", "[ Analyzing Field ]".green());
+        //eprintln!("\t{}\n{field} - {ind}", "[ Analyzing Field ]".green());
         let name = field.split("=")
             .next()
             .context("Invalid field!")?;
@@ -88,7 +88,7 @@ pub fn jmanl_job_str_to_btree<'a>(
             .skip(1)
             .collect::<Vec<&str>>()
             .join("=");
-        eprintln!("\t{}\n{name} - {value} - {ind}", "[ Got Field ]".green());
+        //eprintln!("\t{}\n{name} - {value} - {ind}", "[ Got Field ]".green());
 
         if name == "user" {
             entry.insert("Job_Owner".to_string(), value.to_string());
@@ -175,12 +175,13 @@ pub fn jmanl_job_str_to_btree<'a>(
         * 100f64;
     entry.insert("cpu_efficiency".to_string(), cpu_efficiency.to_string());
 
+    eprintln!("\t\t{}", "[ Done! ]".green());
     Ok(entry)
 }
 pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, String>> {
     let mut entry = BTreeMap::new();
 
-    eprintln!("\n{}\n{job}", "[ Looking at the following job ]".green());
+    //eprintln!("\n{}\n{job}", "[ Looking at the following job ]".green());
 
     for (ind, field) in job.lines().enumerate() {
         if ind == 0 {
@@ -190,7 +191,7 @@ pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, 
         }
 
         let field = field.trim_ascii_start();
-        eprintln!("\t{}\n{field} - {ind} - {field}", "[ Analyzing Field ]".green());
+        //eprintln!("\t{}\n{field} - {ind} - {field}", "[ Analyzing Field ]".green());
         let name = field.split(" = ")
             .next()
             .context("Invalid field!")?;
