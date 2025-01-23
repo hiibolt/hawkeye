@@ -123,7 +123,7 @@ function createJobRow (job, index) {
         .slice(0, 10)
         .join(', ');
     if ( job["nodes"].split(',').length > 10 ) {
-        node_text += ', ... (' + (job["nodes"].split(',').length - 10) + ' more)';
+        node_text += '... (' + (job["nodes"].split(',').length - 10) + ' more)';
     }
 
     const row = document.createElement('div');

@@ -5,7 +5,7 @@ mod daemons;
 mod routes;
 
 use db::lib::*;
-use daemons::{jobs::jobs_daemon, groups::groups_daemon};
+use daemons::{groups::groups_daemon, jobs::{jobs_daemon, old_jobs_daemon}};
 use routes::{
     jobs::jobs_handler,
     stats::stats_handler,
@@ -61,7 +61,8 @@ async fn main() -> Result<()> {
     
     eprintln!("{}", "[ Starting daemons... ]".green());
     tokio::spawn(jobs_daemon(state.clone()));
-    tokio::spawn(groups_daemon(state.clone(), false));
+    tokio::spawn(old_jobs_daemon(state.clone()));
+    tokio::spawn(groups_daemon(state.clone()));
     eprintln!("{}", "[ Daemons started! ]".green());
 
     // Create the Session store and layer

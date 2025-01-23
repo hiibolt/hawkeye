@@ -65,6 +65,7 @@ impl DB {
                 mem_efficiency REAL NOT NULL,
                 walltime_efficiency REAL NOT NULL,
                 cpu_efficiency REAL NOT NULL,
+                end_time TEXT,
                 FOREIGN KEY (owner) REFERENCES Users(owner)
             )",
             [],
@@ -94,7 +95,7 @@ impl DB {
         
         // Add the job
         self.conn.execute(
-            "INSERT OR REPLACE INTO Jobs (pbs_id, name, owner, state, stime, queue, nodes, req_mem, req_cpus, req_gpus, req_walltime, req_select, mem_efficiency, walltime_efficiency, cpu_efficiency) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            "INSERT OR REPLACE INTO Jobs (pbs_id, name, owner, state, stime, queue, nodes, req_mem, req_cpus, req_gpus, req_walltime, req_select, mem_efficiency, walltime_efficiency, cpu_efficiency, end_time) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
             params![
                 job["job_id"],
                 job["Job_Name"],
@@ -111,6 +112,7 @@ impl DB {
                 job["mem_efficiency"],
                 job["walltime_efficiency"],
                 job["cpu_efficiency"],
+                job.get("end_time").unwrap_or(&String::from("not_ended")),
             ],
         )?;
         
@@ -173,10 +175,21 @@ impl DB {
             // If a job's ID is *not* in the active set, we assume it completed
             if !active_ids.contains(&pbs_id) {
                 eprintln!("{}", format!("[ Marking job {} as completed... ]", pbs_id).green());
-    
+
+                let now = SystemTime::now();
+                let duration_since_epoch = now.duration_since(UNIX_EPOCH)
+                    .context("Time went backwards")?;
+                let datetime = DateTime::<Utc>::from(UNIX_EPOCH + duration_since_epoch);
+                let formatted_datetime = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+
                 self.conn.execute(
                     "UPDATE Jobs SET state = 'S' WHERE pbs_id = ?1",
                     [pbs_id],
+                )?;
+
+                self.conn.execute(
+                    "UPDATE Jobs SET end_time = ?1 WHERE pbs_id = ?2",
+                    [formatted_datetime, pbs_id.to_string()],
                 )?;
             }
         }
@@ -206,6 +219,7 @@ impl DB {
                 ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
                 ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
                 ("cpu_efficiency".to_string(), row.get::<_, f64>(14)?.to_string()),
+                ("end_time".to_string(), row.get::<_, String>(15)?),
             ]))
         }).context("Failed to get rows!")?;
     
@@ -234,6 +248,7 @@ impl DB {
                 ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
                 ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
                 ("cpu_efficiency".to_string(), row.get::<_, f64>(14)?.to_string()),
+                ("end_time".to_string(), row.get::<_, String>(15)?),
             ]))
         }).context("Failed to get rows!")?;
     
@@ -262,6 +277,7 @@ impl DB {
                 ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
                 ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
                 ("cpu_efficiency".to_string(), row.get::<_, f64>(14)?.to_string()),
+                ("end_time".to_string(), row.get::<_, String>(15)?),
             ]))
         }).context("Failed to get rows!")?;
     

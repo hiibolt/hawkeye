@@ -13,15 +13,15 @@ const GROUPS_PERIOD: u64 = 60 * 60;
 
 pub async fn grab_group_thread (
     app: Arc<Mutex<AppState>>,
-    remote_username: &str,
-    remote_hostname: &str,
-    user: &str
+    remote_username: String,
+    remote_hostname: String,
+    user: String
 ) -> Result<()> {
     let group_output: String = remote_command(
         &remote_username,
         &remote_hostname,
         "groups",
-        vec![user],
+        vec![&user],
         false
     ).await
         .context("[ ERROR ] Failed to run remote command!")?;
@@ -36,7 +36,7 @@ pub async fn grab_group_thread (
 
     let db = &mut app.lock().await.db;
     for group in groups {
-        db.insert_user_group(user, group)
+        db.insert_user_group(&user, group)
             .with_context(|| format!("Couldn't insert user {user} into group {group}!"))?;
     }
     
@@ -66,13 +66,14 @@ async fn grab_groups_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
         let app = app.clone();
         let remote_username = remote_username.clone();
         let remote_hostname = remote_hostname.clone();
+        let user_cloned = user.clone();
         let handle = tokio::spawn(async move {
             // We deliberately swallow the actual Result here, but you could propagate it
             if let Err(e) = grab_group_thread(
                 app,
-                &remote_username,
-                &remote_hostname,
-                &user
+                remote_username,
+                remote_hostname,
+                user_cloned
             ).await {
                 eprintln!("[ ERROR ] Failed to grab groups for {user}! Error: {e:?}");
             }
@@ -88,9 +89,14 @@ async fn grab_groups_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
 }
 
 pub async fn groups_daemon (
-    app: Arc<Mutex<AppState>>,
-    run_once: bool
+    app: Arc<Mutex<AppState>>
 ) {
+    let groups_period = std::env::var("GROUPS_DAEMON_PERIOD")
+        .unwrap_or(GROUPS_PERIOD.to_string())
+        .parse::<u64>()
+        .expect("Invalid `GROUPS_DAEMON_PERIOD` value!");
+    eprintln!("{}", format!("[ Groups period: {groups_period} ]").blue());
+
     // Wait for the web server to start up
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
@@ -102,15 +108,13 @@ pub async fn groups_daemon (
         if let Err(e) = grab_groups_helper( app.clone() ).await {
             eprintln!("[ ERROR ] Failed to run remote command! Error: {e:?}");
 
-            tokio::time::sleep(tokio::time::Duration::from_secs(GROUPS_PERIOD)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(groups_period)).await;
             continue;
         };
         eprintln!("{}", "[ Groups pulled! ]".green());
 
-        if run_once {
-            break;
-        }
-
-        tokio::time::sleep(tokio::time::Duration::from_secs(GROUPS_PERIOD)).await;
+        tokio::time::sleep(tokio::time::Duration::from_secs(
+            groups_period
+        )).await;
     }
 }

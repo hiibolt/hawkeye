@@ -1,13 +1,14 @@
 use axum::{
     extract::{Form, State}, http::StatusCode, response::{IntoResponse, Redirect}, Json
 };
+use futures::future::join_all;
 use serde::{Serialize, Deserialize};
 use tower_sessions::Session;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use colored::Colorize;
 
-use crate::routes::AppState;
+use crate::{daemons::{groups::grab_group_thread, jobs::grab_old_jobs_thread}, routes::AppState};
 
 #[derive(Serialize)]
 struct UserInfo {
@@ -78,8 +79,13 @@ pub async fn login_handler(
         })?;
 
     if login_result.created_new {
-        // Launch the groups daemon early
-        tokio::spawn(crate::daemons::groups::groups_daemon(app.clone(), true));
+        // Lookup groups and old jobs for the user
+        let handles = vec![
+            tokio::spawn(grab_group_thread(app.clone(), remote_username.clone(), remote_hostname.clone(), payload.username.clone())),
+            tokio::spawn(grab_old_jobs_thread(app.clone(), remote_username, remote_hostname, payload.username.clone()))
+        ];
+        
+        join_all(handles).await;
     }
     
     match login_result.success {
