@@ -193,9 +193,31 @@ async function build_jobs ( ) {
     let user = url.searchParams.get('user');
     let group = url.searchParams.get('group');
 
+    // Filters
+    let owner = url.searchParams.get('owner');
+    let state = url.searchParams.get('state');
+    let queue = url.searchParams.get('queue');
+    let name = url.searchParams.get('name');
+
+    let additional_filters = '';
+    if ( owner ) {
+        additional_filters += `&owner=${owner}`;
+    }
+    if ( state ) {
+        additional_filters += `&state=${state}`;
+    }
+    if ( queue ) {
+        additional_filters += `&queue=${queue}`;
+    }
+    if ( name ) {
+        additional_filters += `&name=${name}`;
+    }
+    console.log(`Additional filters: ${additional_filters}`);
+
     let data;
     if ( user ) {
-        let res = await fetch(`api/v1/jobs?user=${user}`, {
+        // Inherit and pass parameters to the fetch call
+        let res = await fetch(`api/v1/jobs?user=${user}${additional_filters}`, {
             method: 'GET',
             credentials: 'include',
         });
@@ -213,7 +235,8 @@ async function build_jobs ( ) {
             return;
         }
     } else if ( group ) {
-        let res = await fetch(`api/v1/jobs?group=${group}`, {
+        // Inherit and pass parameters to the fetch call
+        let res = await fetch(`api/v1/jobs?group=${group}${additional_filters}`, {
             method: 'GET',
             credentials: 'include',
         });
@@ -231,7 +254,10 @@ async function build_jobs ( ) {
             return;
         }
     } else {
-        let res = await fetch('api/v1/jobs', {
+        // Inherit and pass parameters to the fetch call
+        // (we need to remove the leading '&' and replace it with '?')
+        additional_filters = additional_filters.replace('&', '?');
+        let res = await fetch(`api/v1/jobs${additional_filters}`, {
             method: 'GET',
             credentials: 'include',
         });

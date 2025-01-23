@@ -2,7 +2,7 @@ use std::{collections::{BTreeMap, HashSet}, time::{SystemTime, UNIX_EPOCH}};
 use chrono::{DateTime, Utc};
 
 use anyhow::{Context, Result, anyhow};
-use rusqlite::{params, Connection};
+use rusqlite::{params, params_from_iter, Connection};
 use colored::Colorize;
 
 use super::super::remote::auth::verify_login;
@@ -189,7 +189,7 @@ impl DB {
                 let formatted_datetime = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
 
                 self.conn.execute(
-                    "UPDATE Jobs SET state = 'S' WHERE pbs_id = ?1",
+                    "UPDATE Jobs SET state = 'E' WHERE pbs_id = ?1",
                     [pbs_id],
                 )?;
 
@@ -206,9 +206,32 @@ impl DB {
     pub fn get_user_jobs(
         &mut self,
         username: &str,
+        filter_state: Option<&String>,
+        filter_queue: Option<&String>,
+        filter_owner: Option<&String>,
+        filter_name: Option<&String>,
     ) -> Result<Vec<BTreeMap<String, String>>> {
-        let mut stmt = self.conn.prepare("SELECT * FROM Jobs WHERE owner = ?1")?;
-        let rows = stmt.query_map([username], |row| {
+        let mut additional_filters= String::new();
+        let mut params = vec![username.to_string()];
+        if let Some(filter_state) = filter_state {
+            additional_filters.push_str(" AND state = ?2");
+            params.push(filter_state.to_owned());
+        }
+        if let Some(filter_queue) = filter_queue {
+            additional_filters.push_str(&format!(" AND queue = ?{}", params.len() + 1));
+            params.push(filter_queue.to_owned());
+        }
+        if let Some(filter_owner) = filter_owner {
+            additional_filters.push_str(&format!(" AND owner = ?{}", params.len() + 1));
+            params.push(filter_owner.to_owned());
+        }
+        if let Some(filter_name) = filter_name {
+            additional_filters.push_str(&format!(" AND name = ?{}", params.len() + 1));
+            params.push(filter_name.to_owned());
+        }
+
+        let mut stmt = self.conn.prepare(&format!("SELECT * FROM Jobs WHERE owner = ?1{}", additional_filters))?;
+        let rows = stmt.query_map(params_from_iter(params), |row| {
             Ok(BTreeMap::from_iter(vec![
                 ("pbs_id".to_string(), row.get::<_, i32>(0)?.to_string()),
                 ("name".to_string(), row.get::<_, String>(1)?),
@@ -237,10 +260,35 @@ impl DB {
 
     pub fn get_all_running_jobs (
         &mut self,
+        filter_state: Option<&String>,
+        filter_queue: Option<&String>,
+        filter_owner: Option<&String>,
+        filter_name: Option<&String>,
         censor: bool
     ) -> Result<Vec<BTreeMap<String, String>>> {
-        let mut stmt = self.conn.prepare("SELECT * FROM Jobs WHERE state = 'R'")?;
-        let rows = stmt.query_map([], |row| {
+        let mut additional_filters= String::new();
+        let mut params = vec![];
+        if let Some(filter_state) = filter_state {
+            additional_filters.push_str("state = ?1");
+            params.push(filter_state);
+        } else {
+            additional_filters.push_str("state = 'R'");
+        }
+        if let Some(filter_queue) = filter_queue {
+            additional_filters.push_str(&format!(" AND queue = ?{}", params.len() + 1));
+            params.push(filter_queue);
+        }
+        if let Some(filter_owner) = filter_owner {
+            additional_filters.push_str(&format!(" AND owner = ?{}", params.len() + 1));
+            params.push(filter_owner);
+        }
+        if let Some(filter_name) = filter_name {
+            additional_filters.push_str(&format!(" AND name = ?{}", params.len() + 1));
+            params.push(filter_name);
+        }
+        //  ORDER BY stime DESC
+        let mut stmt = self.conn.prepare(&format!("SELECT * FROM Jobs WHERE {}", additional_filters))?;
+        let rows = stmt.query_map(params_from_iter(params), |row| {
             Ok(BTreeMap::from_iter(vec![
                 ("pbs_id".to_string(), row.get::<_, i32>(0)?.to_string()),
                 ("name".to_string(), row.get::<_, String>(1)?),
@@ -275,10 +323,33 @@ impl DB {
 
     pub fn get_group_jobs (
         &mut self,
-        group: &str,
+        filter_state: Option<&String>,
+        filter_queue: Option<&String>,
+        filter_owner: Option<&String>,
+        filter_name: Option<&String>,
+        group: &str
     ) -> Result<Vec<BTreeMap<String, String>>> {
-        let mut stmt = self.conn.prepare("SELECT * FROM Jobs WHERE owner IN (SELECT user_name FROM UserGroups WHERE group_name = ?1)")?;
-        let rows = stmt.query_map([group], |row| {
+        let mut additional_filters= String::new();
+        let mut params: Vec<String> = vec![group.to_string()];
+        if let Some(filter_state) = filter_state {
+            additional_filters.push_str(" AND state = ?2");
+            params.push(filter_state.to_owned());
+        }
+        if let Some(filter_queue) = filter_queue {
+            additional_filters.push_str(&format!(" AND queue = ?{}", params.len() + 1));
+            params.push(filter_queue.to_owned());
+        }
+        if let Some(filter_owner) = filter_owner {
+            additional_filters.push_str(&format!(" AND owner = ?{}", params.len() + 1));
+            params.push(filter_owner.to_owned());
+        }
+        if let Some(filter_name) = filter_name {
+            additional_filters.push_str(&format!(" AND name = ?{}", params.len() + 1));
+            params.push(filter_name.to_owned());
+        }
+
+        let mut stmt = self.conn.prepare(&format!("SELECT * FROM Jobs WHERE owner IN (SELECT user_name FROM UserGroups WHERE group_name = ?1){}", additional_filters))?;
+        let rows = stmt.query_map(params_from_iter(params), |row| {
             Ok(BTreeMap::from_iter(vec![
                 ("pbs_id".to_string(), row.get::<_, i32>(0)?.to_string()),
                 ("name".to_string(), row.get::<_, String>(1)?),

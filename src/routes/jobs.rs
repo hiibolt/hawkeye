@@ -14,6 +14,14 @@ pub async fn jobs_handler(
 ) -> Result<Json<Vec<BTreeMap<String, String>>>, (StatusCode, String)> {
     eprintln!("{}", "[ Got a `jobs` request! ]".green());
 
+    // Grab filter parameters
+    eprintln!("Parameters: {params:?}");
+
+    let filter_state = params.get("state");
+    let filter_queue = params.get("queue");
+    let filter_owner = params.get("owner");
+    let filter_name = params.get("name");
+
     // Check if the user is in the session
     let maybe_username = session.get::<String>("username")
         .await
@@ -31,7 +39,13 @@ pub async fn jobs_handler(
         eprintln!("\t{}", "[ User not logged in! ]".yellow());
         return match app.lock().await
             .db
-            .get_all_running_jobs(true)
+            .get_all_running_jobs(
+                None,
+                filter_queue,
+                None,
+                filter_name,
+                true
+            )
         {
             Ok(jobs) => {
                 if params.get("user").is_some() {
@@ -72,7 +86,16 @@ pub async fn jobs_handler(
     // If the user wants to filter by username, we'll do that
     if let Some(user_param) = params.get("user") {
         if user_param == &username || is_admin {
-            match app.lock().await.db.get_user_jobs(user_param) {
+            match app.lock().await
+                .db
+                .get_user_jobs(
+                    user_param,
+                    filter_state,
+                    filter_queue,
+                    filter_owner,
+                    filter_name
+                )
+            {
                 Ok(jobs) => return Ok(Json(jobs)),
                 Err(e) => return Err((
                     StatusCode::INTERNAL_SERVER_ERROR,
@@ -108,7 +131,13 @@ pub async fn jobs_handler(
 
         match app.lock().await
             .db
-            .get_group_jobs(group)
+            .get_group_jobs(
+                filter_state,
+                filter_queue,
+                filter_owner,
+                filter_name,
+                group
+            )
         {
             Ok(jobs) => return Ok(Json(jobs)),
             Err(e) => {
@@ -124,7 +153,13 @@ pub async fn jobs_handler(
     // we'll just return all running jobs, but censor job owners
     match app.lock().await
         .db
-        .get_all_running_jobs(!is_admin)
+        .get_all_running_jobs(
+            filter_state,
+            filter_queue,
+            if is_admin { filter_owner } else { None },
+            filter_name,
+            !is_admin
+        )
     {
         Ok(jobs) => return Ok(Json(jobs)),
         Err(e) => {
