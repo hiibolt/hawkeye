@@ -299,32 +299,32 @@ async function build_section_header ( ) {
     let user = url.searchParams.get('user');
     let group = url.searchParams.get('group');
 
-    let header = document.getElementById('job-section-header');
-    if ( user ) {
-        header.innerHTML = `Jobs Owned by User '${user}' on Metis`;
-    } else if ( group ) {
-        header.innerHTML = `Jobs Owned by Group '${group}' on Metis`;
-    } else {
-        header.innerHTML = `All Running Jobs on Metis`;
-    }
-
     // Get all filters
     let owner = url.searchParams.get('owner');
     let state = url.searchParams.get('state');
     let queue = url.searchParams.get('queue');
     let name = url.searchParams.get('name');
     let date = url.searchParams.get('date');
+    let filters = [];
+
+    let header = document.getElementById('job-section-header');
+    if ( user ) {
+        header.innerHTML = `Jobs Owned by User '${user}' on Metis`;
+    } else if ( group ) {
+        header.innerHTML = `Jobs Owned by Group '${group}' on Metis`;
+    } else {
+        header.innerHTML = `All Jobs on Metis`;
+    }
 
     // Add filters to the header
-    let filters = [];
     if ( owner ) { filters.push(`Owner: ${owner}`); }
-    if ( state ) { filters.push(`State: ${state}`); }
+    if ( state ) { filters.push(`State: ${state}`); } else { filters.push(`State: R`); }
     if ( queue ) { filters.push(`Queue: ${queue}`); }
     if ( name ) { filters.push(`Name: ${name}`); }
     if ( date ) { filters.push(`Date: ${new Date(parseInt(date)*1000).toLocaleString()}`); }
 
     if ( filters.length > 0 ) {
-        header.innerHTML += `- Filters - ${filters.join(', ')}`;
+        header.innerHTML += ` - Filters - ${filters.join(', ')}`;
     }
 
     header.style.visibility = 'visible';
