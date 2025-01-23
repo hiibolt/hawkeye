@@ -309,19 +309,29 @@ async function build_section_header ( ) {
 
     let header = document.getElementById('job-section-header');
     if ( user ) {
-        header.innerHTML = `Jobs Owned by User '${user}' on Metis`;
+        header.innerHTML = `<b>Metis User '${user}' Jobs</b>`;
     } else if ( group ) {
-        header.innerHTML = `Jobs Owned by Group '${group}' on Metis`;
+        header.innerHTML = `<b>Metis Group '${group}' Jobs</b>`;
     } else {
-        header.innerHTML = `All Jobs on Metis`;
+        header.innerHTML = `<b>All Jobs on Metis</b>`;
     }
 
     // Add filters to the header
-    if ( owner ) { filters.push(`Owner: ${owner}`); }
-    if ( state ) { filters.push(`State: ${state}`); } else { filters.push(`State: R`); }
-    if ( queue ) { filters.push(`Queue: ${queue}`); }
-    if ( name ) { filters.push(`Name: ${name}`); }
-    if ( date ) { filters.push(`Date: ${new Date(parseInt(date)*1000).toLocaleString()}`); }
+    if ( owner ) { filters.push(`<b>Owner</b>: <i>${owner}</i>`); }
+    if ( state ) { filters.push(`<b>State</b>: <i>${state}</i>`); } else { filters.push(`<b>State</b>: <i>R</i>`); }
+    if ( queue ) { filters.push(`<b>Queue</b>: <i>${queue}</i>`); }
+    if ( name ) { filters.push(`<b>Name</b>: <i>${name}</i>`); }
+    if ( date ) { 
+        // Build the timestamp for the date specified
+        const now = new Date();
+        const dateObj = new Date(parseInt(date) * 1000);
+        filters.push(`<b>Date</b>: <i>${dateObj.toLocaleString()} - Now</i>`);
+    } else { 
+        // Build the timestamp for the past month
+        const now = new Date();
+        const past_month = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        filters.push(`<b>Date</b>: <i>${past_month.toLocaleString()} - Now</i>`);
+    }
 
     if ( filters.length > 0 ) {
         header.innerHTML += ` - Filters - ${filters.join(', ')}`;
@@ -411,7 +421,8 @@ async function build_filter_section ( ) {
                 dateParam = Math.floor(new Date(now.getFullYear(), 0, 1).getTime() / 1000);
                 break;
             case 'all':
-                dateParam = null; // No date filter
+                // Ten years ago
+                dateParam = Math.floor(new Date(now.getFullYear() - 10, now.getMonth(), now.getDate()).getTime() / 1000);
                 break;
         }
         if (dateParam !== null) url.searchParams.set('date', dateParam);
