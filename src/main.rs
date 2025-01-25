@@ -4,12 +4,16 @@ mod remote;
 mod daemons;
 mod routes;
 
+
 use db::lib::*;
 use daemons::{groups::groups_daemon, jobs::{jobs_daemon, old_jobs_daemon}};
 use routes::{
-    jobs::jobs_handler,
-    stats::stats_handler,
     auth::{login_handler, logout_handler, me_handler},
+    completed::completed,
+    login::login, 
+    running::running, 
+    search::search, 
+    stats::stats,
     AppState
 };
 
@@ -18,7 +22,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use tokio::sync::Mutex;
 use axum::{
-    response::Html, routing::{get, post}, Router
+    routing::{get, post}, Router
 };
 use colored::Colorize;
 use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
@@ -85,8 +89,6 @@ async fn main() -> Result<()> {
 
     // Build the V1 API router
     let api_v1 = Router::new()
-        .route("/jobs", get(jobs_handler))
-        .route("/stats", get(stats_handler))
         .nest("/auth", auth_routes)
         .with_state(state.clone());
 
@@ -102,13 +104,16 @@ async fn main() -> Result<()> {
     // Nest the API into the general app router
     let app = Router::new()
         .nest("/api/v1", api_v1)
-        .route("/", get(|| async { Html(std::include_str!("../public/html/index.html")) }))
-        .route("/index.html", get(|| async { Html(std::include_str!("../public/html/index.html")) }))
-        .route("/login.html", get(|| async { Html(std::include_str!("../public/html/login.html")) }))
-        .route("/stats.html", get(|| async { Html(std::include_str!("../public/html/stats.html")) }))
+        .route("/", get(running))
+        .route("/login", get(login))
+        .route("/stats", get(stats))
+        .route("/running", get(running))
+        .route("/completed", get(completed))
+        .route("/search", get(search))
         .nest_service("/public", ServeDir::new("public"))
         .layer(cors)
-        .layer(session_layer);
+        .layer(session_layer)
+        .with_state(state.clone());
 
     // Start the server
     let port = std::env::var("PORT").unwrap_or("5777".to_string());

@@ -1,0 +1,228 @@
+{% extends "navbar_jobs.html" %}
+
+{% block navbar %}
+    <div class="nav-item">
+        <h2>Stats</h2>
+    </div>
+    <div class="nav-item">
+        <p>This page is a wrapper around many commands over time, which create a detailed profile of a particular job on Metis.</p>
+    </div>
+    {% match username %}
+        {% when None %}
+            <div class="nav-item">
+                <p>You cannot view this data, please <a href="login">log in</a> to view it.</p>
+            </div>
+        {% when Some with (username) %}
+    {% endmatch %}
+{% endblock %}
+
+{% block jobs %}
+    {% match username %}
+    {% when Some with (username) %}
+        {% match job %}
+        {% when Some with (job_tuple) %}
+        {% let job = job_tuple.0|as_ref %}
+        {% let stats = job_tuple.1|as_ref %}
+
+        <div class="job-card">        
+            <div class="job-header">
+                <p>
+                    <b>{{ job["name"] }} - {{ job["pbs_id"] }} ({{ job["state"] }})</b>
+                    <br>
+                    Submitted by <a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a> on <b>{{ timestamp_to_date(job["start_time"]) }}</b>
+                </p>
+            </div>
+            <table class="job-table">
+                <thead>
+                    <tr>
+                        <th>Queue</th>
+                        <th>Walltime</th>
+                        <th># of CPUs</th>
+                        <th># of GPUs</th>
+                        <th>Memory</th>
+                        <th>End Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ job["queue"] }}</td>
+                        <td>{{ job["req_walltime"] }}</td>
+                        <td>{{ job["req_cpus"] }}</td>
+                        {% match job.get("req_gpus") %}
+                        {% when Some with (req_gpus) %}
+                            <td>{{ req_gpus }}</td>
+                        {% when None %}
+                            <td>0</td>
+                        {% endmatch %}
+                        <td>{{ job["req_mem"] }}GB</td>
+                        {% if job["end_time"] == "2147483647" %}
+                            <td>Not Ended</td>
+                        {% else %}
+                            <td>{{ timestamp_to_date(job["end_time"]) }}</td>
+                        {% endif %}
+                    </tr>
+                </tbody>
+                <thead>
+                    <tr>
+                        <th>Chunks</th>
+                        <th>Used CPU</th>
+                        <th>Used Mem</th>
+                        <th>Used Mem/CPU</th>
+                        <th>Used/Req Mem</th>
+                        <th>Used Walltime</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td></td>
+                        <td>{{ job["used_cpu_percent"] }}%</td>
+                        <td>{{ job["used_mem"] }}GB</td>
+                        {% match div_two_i32s_into_f32(job["used_mem"], job["req_cpus"]) %}
+                        {% when Ok with (used_mem_per_cpu) %}
+                            <td>{{ used_mem_per_cpu }}GB</td>
+                        {% when Err with (_) %}
+                            <td>NaN</td>
+                        {% endmatch %}
+                        {% match div_two_i32s_into_f32(job["used_mem"], job["req_mem"]) %}
+                        {% when Ok with (used_mem_per_req) %}
+                            <td>{{ used_mem_per_req }}</td>
+                        {% when Err with (_) %}
+                            <td>NaN</td>
+                        {% endmatch %}
+                        <td>{{ job["used_walltime"] }}</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="job-nodes">
+                <p>
+                    <b>Nodes</b>
+                    <br>
+                    {{ job["nodes"] }}
+                </p>
+                <p>
+                    <b>PBS Selection</b>
+                    <br>
+                    {{ job["req_select"] }}
+                </p>
+            </div>
+            <div>
+                {% match to_i32(job["cpu_efficiency"]) %}
+                    {% when Ok with (eff) %}
+                        {% let width_eff = 5+eff %}
+                        {% if width_eff > 100 %}
+                            {% let width_eff = 100 %}
+                        {% endif %}
+                        <div class="progress-container">
+                            <div style="display:flex;justify-content:space-between;">
+                                <strong>CPU Efficiency (%)</strong>
+                                <strong style="text-align:right;margin-left:auto">🖥️</strong>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ width_eff }}%; background-color: rgb({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0);">
+                                    <b>{{ eff+1 }} </b>
+                                </div>
+                            </div>
+                        </div>
+                    {% when Err with (_) %}
+                {% endmatch %}
+                {% match to_i32(job["mem_efficiency"]) %}
+                    {% when Ok with (eff) %}
+                        {% let width_eff = 5+eff %}
+                        {% if width_eff > 100 %}
+                            {% let width_eff = 100 %}
+                        {% endif %}
+                        <div class="progress-container">
+                            <div style="display:flex;justify-content:space-between;">
+                                <strong>Memory Efficiency (%)</strong>
+                                <strong style="text-align:right;margin-left:auto">💾</strong>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ width_eff }}%; background-color: rgb({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0);">
+                                    <b>{{ eff+1 }} </b>
+                                </div>
+                            </div>
+                        </div>
+                    {% when Err with (_) %}
+                {% endmatch %}
+                {% match to_i32(job["walltime_efficiency"]) %}
+                    {% when Ok with (eff) %}
+                        {% let width_eff = 5+eff %}
+                        {% if width_eff > 100 %}
+                            {% let width_eff = 100 %}
+                        {% endif %}
+                        <div class="progress-container">
+                            <div style="display:flex;justify-content:space-between;">
+                                <strong>Walltime Usage (%)</strong>
+                                <strong style="text-align:right;margin-left:auto">🕒</strong>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ width_eff }}%; background-color: rgb({{ (255*eff)/100 }}, {{ 205-(205*eff)/100 }}, 0);">
+                                    <b>{{ eff+1 }}</b>
+                                </div>
+                            </div>
+                        </div>
+                    {% when Err with (_) %}
+                {% endmatch %}
+            </div>
+            <canvas id="cpuChart" width="400" height="200"></canvas>
+            <canvas id="memChart" width="400" height="200"></canvas>
+            <script>
+                const stats_json = {{ stats|tojson|safe }};
+                const ctxCpu = document.getElementById('cpuChart').getContext('2d');
+                const ctxMem = document.getElementById('memChart').getContext('2d');
+
+                const cpuData = stats_json.map(stat => parseFloat(stat.cpu_percent));
+                const memData = stats_json.map(stat => parseFloat(stat.mem));
+
+                console.log(cpuData);
+                console.log(memData);
+                const cpuChart = new Chart(ctxCpu, {
+                    type: 'line',
+                    data: {
+                        labels: stats_json.map((_, index) => `${stats_json[index].datetime}`),
+                        datasets: [{
+                            label: 'CPU Usage (%)',
+                            data: cpuData,
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            fill: true,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                            }
+                        }
+                    }
+                });
+                const memChart = new Chart(ctxMem, {
+                    type: 'line',
+                    data: {
+                        labels: stats_json.map((_, index) => `${stats_json[index].datetime}`),
+                        datasets: [{
+                            label: 'Memory Usage (GB)',
+                            data: memData,
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            fill: true,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                            }
+                        }
+                    }
+                });
+            </script>
+        </div>
+        {% when None %}
+        {% endmatch %}
+    {% when None %}
+    {% endmatch %}
+{% endblock %}

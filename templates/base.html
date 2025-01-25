@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="public/styles/styles.css">
+
+    <!-- Favicon -->
+    <link rel="icon" href="public/images/favicon.ico" type="image/x-icon">
+    <!-- Above Favicon Created and Licensed by https://thenounproject.com/creator/heztasia/ -->
+</head>
+<body>
+    <!-- Header Bar -->
+    <header>
+        <div class="branding">
+            <h1>NIU Batchmon</h1>
+        </div>
+        <div class="auth" id="auth">
+            <a href="running">
+                <button class="header-button"><b>Running Jobs</b></button>
+            </a>
+            <a href="completed">
+                <button class="header-button"><b>Completed Jobs</b></button>
+            </a>
+            <a href="search">
+                <button class="header-button"><b>Search</b></button>
+            </a>
+            {% match username %}
+                {% when Some with (username) %}
+                    <button class="signin-button"><b>{{ username }}</b></button>
+                    <button class="signin-button" id="signout-button"><b>Sign Out</b></button>
+                    <script>
+                        const signout_button = document.getElementById('signout-button');
+                        signout_button.addEventListener('click', () => {
+                            // Send a post request (with credentials) to `api/v1/auth/logout`,
+                            //  then redirect to the root page.
+                            fetch('api/v1/auth/logout', {
+                                method: 'POST',
+                                credentials: 'include'
+                            }).then(() => {
+                                window.location.href = '/login';
+                            });
+                        });
+                    </script>
+                {% when None %}
+                    <a href="https://www.niu.edu/crcd/prospective-user/access.shtml">
+                        <button class="signin-button"><b>Register</b></button>
+                    </a>
+                    <a href="login">
+                        <button class="signin-button"><b>Sign In</b></button>
+                    </a>
+            {% endmatch %}
+        </div>
+    </header>
+    <body>
+        {% block body %}{% endblock %}
+    </body>
+</body>
+</html>

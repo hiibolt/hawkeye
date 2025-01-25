@@ -103,7 +103,7 @@ pub async fn login_handler(
 
             drop(login_result);
 
-            Ok(Redirect::to("/index.html"))
+            Ok(Redirect::to("/"))
         },
         false => {
             drop(login_result);
@@ -111,7 +111,7 @@ pub async fn login_handler(
             // If not verified or an error, you can respond with an error page/JSON
             // Here we'll just return a plain text error
             eprintln!("{}", "[ Invalid login! ]".red());
-            Ok(Redirect::to("/login.html?invalid=true"))
+            Ok(Redirect::to("/login?invalid=true"))
         }
     }
 }

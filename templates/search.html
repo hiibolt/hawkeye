@@ -1,0 +1,242 @@
+{% extends "navbar_jobs.html" %}
+
+{% block navbar %}
+    <div class="nav-item">
+        <h2>Complete Search</h2>
+    </div>
+    <div class="nav-item">
+        <p>This page is a wrapper around a variety of commands, and allows you to search for any job type on Metis.</p>
+    </div>
+    {% match username %}
+        {% when None %}
+            <div class="nav-item">
+                <p>You cannot view this data, please <a href="login">log in</a> to view it.</p>
+            </div>
+        {% when Some with (username) %}
+            <div class="filter-container">
+                <h3>Filters</h3>
+                {% match queue_query %}
+                    {% when Some with (queue_query) %}
+                        <input type="text" id="queue" placeholder="Queue" value="{{ queue_query }}"/>
+                    {% when None %}
+                        <input type="text" id="queue" placeholder="Queue"/>
+                {% endmatch %}
+                {% match state_query %}
+                    {% when Some with (state_query) %}
+                        <input type="text" id="state" placeholder="State" value="{{ state_query }}"/>
+                    {% when None %}
+                        <input type="text" id="state" placeholder="State"/>
+                {% endmatch %}
+                {% match name_query %}
+                    {% when Some with (name_query) %}
+                        <input type="text" id="name" placeholder="Job Name" value="{{ name_query }}"/>
+                    {% when None %}
+                        <input type="text" id="name" placeholder="Job Name"/>
+                {% endmatch %}
+                {% match user_query %}
+                    {% when Some with (user_query) %}
+                        <input type="text" id="user" placeholder="Username" value="{{ user_query }}"/>
+                    {% when None %}
+                        <input type="text" id="user" placeholder="Username"/>
+                {% endmatch %}
+                <div>
+                    <label for="date-dropdown"><b>Date:</b></label>
+                    {% match date_query %}
+                        {% when Some with (date_query) %}
+                            <select id="date-dropdown">
+                                {% if date_query == "all" %}
+                                    <option value="all" selected="selected">All</option>
+                                {% else %}
+                                    <option value="all">All</option>
+                                {% endif %}
+                                {% if date_query == "day" %}
+                                    <option value="day" selected="selected">Day</option>
+                                {% else %}
+                                    <option value="day">Day</option>
+                                {% endif %}
+                                {% if date_query == "month" %}
+                                    <option value="month" selected="selected">Month</option>
+                                {% else %}
+                                    <option value="month">Month</option>
+                                {% endif %}
+                                {% if date_query == "year" %}
+                                    <option value="year" selected="selected">Year</option>
+                                {% else %}
+                                    <option value="year">Year</option>
+                                {% endif %}
+                            </select>
+                        {% when None %}
+                            <select id="date-dropdown">
+                                <option value="all">All</option>
+                                <option value="day">Day</option>
+                                <option value="month" selected="selected">Month</option>
+                                html <option value="year">Year</option>
+                            </select>
+                    {% endmatch %}
+                </div>
+            
+                <br>
+            
+                <button id="search-button">Search</button>
+            </div>
+            <script>
+                console.log(":3");
+                const search_button = document.getElementById('search-button');
+                const user_input = document.getElementById('user');
+                const queue_input = document.getElementById('queue');
+                const state_input = document.getElementById('state');
+                const name_input = document.getElementById('name');
+                const date_dropdown = document.getElementById('date-dropdown');
+            
+                search_button.addEventListener('click', () => {
+                    const user = user_input.value;
+                    const queue = queue_input.value;
+                    const state = state_input.value;
+                    const name = name_input.value;
+                    const date = date_dropdown.value;
+                    let url = `search?`;
+
+                    if (user) {
+                        url += `user=${user}&`;
+                    }
+                    if (queue) {
+                        url += `queue=${queue}&`;
+                    }
+                    if (state) {
+                        url += `state=${state}&`;
+                    }
+                    if (name) {
+                        url += `name=${name}&`;
+                    }
+                    if (date) {
+                        url += `date=${date}&`;
+                    }
+
+                    // Remove trailing & (if it exists)
+                    if (url[url.length - 1] === "&") {
+                        url = url.slice(0, -1);
+                    }
+
+                    window.location.href = url;
+                });
+            </script>
+    {% endmatch %}
+{% endblock %}
+
+{% block jobs %}
+    <div class="job-grid" id="running-jobs">
+    {% for job in jobs %}
+        <div class="job-card">
+            <div class="job-header">
+                <p>
+                    <b>{{ job["name"] }} - {{ job["pbs_id"] }} ({{ job["state"] }})</b>
+                    <br>
+                    Submitted by <a href="index.html?user=${job.owner}">{{ job["owner"] }}</a> on <b>{{ timestamp_to_date(job["start_time"]) }}</b>
+                </p>
+            </div>
+
+            <table class="job-table">
+                <thead>
+                    <tr>
+                        <th>Queue</th>
+                        <th>Walltime</th>
+                        <th># of CPUs</th>
+                        <th># of GPUs</th>
+                        <th>Memory</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ job["queue"] }}</td>
+                        <td>{{ job["req_walltime"] }}</td>
+                        <td>{{ job["req_cpus"] }}</td>
+                        <td>
+                            {% match job.get("req_gpus") %}
+                                {% when Some with (gpus) %}
+                                    {{ gpus }}
+                                {% when None %}
+                            {% endmatch %}
+                        </td>
+                        <td>{{ job["req_mem"] }}GB</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="job-nodes">
+                <p>
+                    <b>Nodes</b>
+                    <br>
+                    {{ parse_nodes(job["nodes"]) }}
+                </p>
+            </div>
+            <div>
+                {% match to_i32(job["cpu_efficiency"]) %}
+                    {% when Ok with (eff) %}
+                        {% let width_eff = 5+eff %}
+                        {% if width_eff > 100 %}
+                            {% let width_eff = 100 %}
+                        {% endif %}
+                        <div class="progress-container">
+                            <div style="display:flex;justify-content:space-between;">
+                                <strong>CPU Efficiency (%)</strong>
+                                <strong style="text-align:right;margin-left:auto">🖥️</strong>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ width_eff }}%; background-color: rgb({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0);">
+                                    <b>{{ eff+1 }} </b>
+                                </div>
+                            </div>
+                        </div>
+                    {% when Err with (_) %}
+                {% endmatch %}
+                {% match to_i32(job["mem_efficiency"]) %}
+                    {% when Ok with (eff) %}
+                        {% let width_eff = 5+eff %}
+                        {% if width_eff > 100 %}
+                            {% let width_eff = 100 %}
+                        {% endif %}
+                        <div class="progress-container">
+                            <div style="display:flex;justify-content:space-between;">
+                                <strong>Memory Efficiency (%)</strong>
+                                <strong style="text-align:right;margin-left:auto">💾</strong>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ width_eff }}%; background-color: rgb({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0);">
+                                    <b>{{ eff+1 }} </b>
+                                </div>
+                            </div>
+                        </div>
+                    {% when Err with (_) %}
+                {% endmatch %}
+                {% match to_i32(job["walltime_efficiency"]) %}
+                    {% when Ok with (eff) %}
+                        {% let width_eff = 5+eff %}
+                        {% if width_eff > 100 %}
+                            {% let width_eff = 100 %}
+                        {% endif %}
+                        <div class="progress-container">
+                            <div style="display:flex;justify-content:space-between;">
+                                <strong>Walltime Usage (%)</strong>
+                                <strong style="text-align:right;margin-left:auto">🕒</strong>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ width_eff }}%; background-color: rgb({{ (255*eff)/100 }}, {{ 205-(205*eff)/100 }}, 0);">
+                                    <b>{{ eff+1 }}</b>
+                                </div>
+                            </div>
+                        </div>
+                    {% when Err with (_) %}
+                {% endmatch %}
+            </div>
+            <br>
+            {% match username %}
+                {% when Some with (_) %}
+                    <a href="stats.html?user={{ job["owner"] }}&id={{ job["pbs_id"] }}">
+                        <button><b>View Detailed Stats</b></button>
+                    </a>
+                {% when None %}
+            {% endmatch %}
+        </div>
+    {% endfor %}
+    </div>
+{% endblock %}

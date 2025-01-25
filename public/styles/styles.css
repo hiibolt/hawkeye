@@ -38,6 +38,21 @@ header {
     background-color: #333; /* Darker shade of black on hover */
     transform: translateY(-1px); /* Slight drop effect */
 }
+.header-button {
+    background-color: #A40000; /* NIU Black */
+    color: white;
+    border: none;
+    padding: 10px 15px; /* Keep the original sizing */
+    cursor: pointer;
+    border-radius: 8px; /* Rounded edges */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Drop shadow */
+    text-align: center; /* Centered text */
+    font-size: 14px; /* Match font size of job-card button */
+    transition: background-color 0.3s, transform 0.2s; /* Smooth transitions */
+}
+.header-button:hover {
+    transform: translateY(-1px); /* Slight drop effect */
+}
 
 .container {
     display: flex;

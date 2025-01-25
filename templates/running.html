@@ -1,0 +1,135 @@
+{% extends "navbar_jobs.html" %}
+
+{% block navbar %}
+    <div class="nav-item">
+        <h2><code>jobstat</code></h2>
+    </div>
+    <div class="nav-item">
+        <p>This page is a wrapper around the <code>jobstat -anL</code> command, which returns a list of all running jobs on Metis.</p>
+    </div>
+    {% match username %}
+        {% when None %}
+        <div class="nav-item">
+            <p>Job names are currently redacted, please <a href="login">log in</a> to view them.</p>
+        </div>
+        {% when Some with (_) %}
+    {% endmatch %}
+{% endblock %}
+
+{% block jobs %}
+    <div class="job-grid" id="running-jobs">
+    {% for job in jobs %}
+        <div class="job-card">
+            <div class="job-header">
+                <p>
+                    <b>{{ job["name"] }} - {{ job["pbs_id"] }} ({{ job["state"] }})</b>
+                    <br>
+                    Submitted by <a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a> on <b>{{ timestamp_to_date(job["start_time"]) }}</b>
+                </p>
+            </div>
+
+            <table class="job-table">
+                <thead>
+                    <tr>
+                        <th>Queue</th>
+                        <th>Walltime</th>
+                        <th># of CPUs</th>
+                        <th># of GPUs</th>
+                        <th>Memory</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ job["queue"] }}</td>
+                        <td>{{ job["req_walltime"] }}</td>
+                        <td>{{ job["req_cpus"] }}</td>
+                        <td>
+                            {% match job.get("req_gpus") %}
+                                {% when Some with (gpus) %}
+                                    {{ gpus }}
+                                {% when None %}
+                            {% endmatch %}
+                        </td>
+                        <td>{{ job["req_mem"] }}GB</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="job-nodes">
+                <p>
+                    <b>Nodes</b>
+                    <br>
+                    {{ parse_nodes(job["nodes"]) }}
+                </p>
+            </div>
+            <div>
+                {% match to_i32(job["cpu_efficiency"]) %}
+                    {% when Ok with (eff) %}
+                        {% let width_eff = 5+eff %}
+                        {% if width_eff > 100 %}
+                            {% let width_eff = 100 %}
+                        {% endif %}
+                        <div class="progress-container">
+                            <div style="display:flex;justify-content:space-between;">
+                                <strong>CPU Efficiency (%)</strong>
+                                <strong style="text-align:right;margin-left:auto">🖥️</strong>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ width_eff }}%; background-color: rgb({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0);">
+                                    <b>{{ eff+1 }} </b>
+                                </div>
+                            </div>
+                        </div>
+                    {% when Err with (_) %}
+                {% endmatch %}
+                {% match to_i32(job["mem_efficiency"]) %}
+                    {% when Ok with (eff) %}
+                        {% let width_eff = 5+eff %}
+                        {% if width_eff > 100 %}
+                            {% let width_eff = 100 %}
+                        {% endif %}
+                        <div class="progress-container">
+                            <div style="display:flex;justify-content:space-between;">
+                                <strong>Memory Efficiency (%)</strong>
+                                <strong style="text-align:right;margin-left:auto">💾</strong>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ width_eff }}%; background-color: rgb({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0);">
+                                    <b>{{ eff+1 }} </b>
+                                </div>
+                            </div>
+                        </div>
+                    {% when Err with (_) %}
+                {% endmatch %}
+                {% match to_i32(job["walltime_efficiency"]) %}
+                    {% when Ok with (eff) %}
+                        {% let width_eff = 5+eff %}
+                        {% if width_eff > 100 %}
+                            {% let width_eff = 100 %}
+                        {% endif %}
+                        <div class="progress-container">
+                            <div style="display:flex;justify-content:space-between;">
+                                <strong>Walltime Usage (%)</strong>
+                                <strong style="text-align:right;margin-left:auto">🕒</strong>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: {{ width_eff }}%; background-color: rgb({{ (255*eff)/100 }}, {{ 205-(205*eff)/100 }}, 0);">
+                                    <b>{{ eff+1 }}</b>
+                                </div>
+                            </div>
+                        </div>
+                    {% when Err with (_) %}
+                {% endmatch %}
+            </div>
+            <br>
+            {% match username %}
+                {% when Some with (_) %}
+                    <a href="stats?id={{ job["pbs_id"] }}">
+                        <button><b>View Detailed Stats</b></button>
+                    </a>
+                {% when None %}
+            {% endmatch %}
+        </div>
+    {% endfor %}
+    </div>
+{% endblock %}

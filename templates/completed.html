@@ -1,0 +1,132 @@
+{% extends "navbar_jobs.html" %}
+
+{% block navbar %}
+    <div class="nav-item">
+        <h2><code>jmanl</code></h2>
+    </div>
+    <div class="nav-item">
+        <p>This page is a wrapper around the <code>jmanl username timeslice</code> command, which returns a table of completed jobs for a particular user on Metis.</p>
+    </div>
+    {% match username %}
+        {% when None %}
+            <div class="nav-item">
+                <p>You cannot view this data, please <a href="login">log in</a> to view it.</p>
+            </div>
+        {% when Some with (username) %}
+            <div class="filter-container">
+                <h3>Filters</h3>
+                {% match user_query %}
+                    {% when Some with (user_query) %}
+                        <input type="text" id="user" placeholder="Username" value="{{ user_query }}"/>
+                    {% when None %}
+                        <input type="text" id="user" placeholder="Username" value="{{ username }}"/>
+                {% endmatch %}
+                <div>
+                    <label for="date-dropdown"><b>Date:</b></label>
+                    {% match date_query %}
+                        {% when Some with (date_query) %}
+                            <select id="date-dropdown">
+                                {% if date_query == "all" %}
+                                    <option value="all" selected="selected">All</option>
+                                {% else %}
+                                    <option value="all">All</option>
+                                {% endif %}
+                                {% if date_query == "day" %}
+                                    <option value="day" selected="selected">Day</option>
+                                {% else %}
+                                    <option value="day">Day</option>
+                                {% endif %}
+                                {% if date_query == "month" %}
+                                    <option value="month" selected="selected">Month</option>
+                                {% else %}
+                                    <option value="month">Month</option>
+                                {% endif %}
+                                {% if date_query == "year" %}
+                                    <option value="year" selected="selected">Year</option>
+                                {% else %}
+                                    <option value="year">Year</option>
+                                {% endif %}
+                            </select>
+                        {% when None %}
+                            <select id="date-dropdown">
+                                <option value="all">All</option>
+                                <option value="day">Day</option>
+                                <option value="month" selected="selected">Month</option>
+                                <option value="year">Year</option>
+                            </select>
+                    {% endmatch %}
+                </div>
+            
+                <br>
+            
+                <button id="search-button">Search</button>
+            </div>
+    {% endmatch %}
+
+    <script>
+        const search_button = document.getElementById('search-button');
+        const user_input = document.getElementById('user');
+        const date_dropdown = document.getElementById('date-dropdown');
+    
+        search_button.addEventListener('click', () => {
+            const user = user_input.value;
+            const date = date_dropdown.value;
+            window.location.href = `completed?user=${user}&date=${date}`;
+        });
+    </script>
+{% endblock %}
+
+{% block jobs %}
+    {% match username %}
+        {% when Some with (username) %}
+            <div class="completed-table-container">
+                <table class="job-table">
+                <tr>
+                    <th>Job ID</th>
+                    <th># of CPUs</th>
+                    <th>Nodes</th>
+                    <th>Chunks</th> <!-- leave blank on table -->
+                    <th>Used Memory</th>
+                    <th>Used Memory/CPU</th>
+                    <th>Requested Memory</th>
+                    <th>Req/Used Memory</th>
+                    <th>Used Walltime</th>
+                    <th>End Date</th>
+                    <th>Exit Status</th> <!-- leave blank on table -->
+                    <th>More</th>
+                </tr>
+                {% for job in jobs %}
+                    <tr>
+                        <td><b>{{ job["pbs_id"] }}</b></td>
+                        <td>{{ job["req_cpus"] }}</td>
+                        <td>{{ job["req_nodes"] }}</td>
+                        <td></td>
+                        <td>{{ job["used_mem"] }}GB</td>
+                        {% match div_two_i32s_into_f32(job["used_mem"], job["req_cpus"]) %}
+                            {% when Ok with (used_mem_per_cpu) %}
+                                <td>{{ used_mem_per_cpu }}</td>
+                            {% when Err with (_) %}
+                                <td>NaN</td>
+                        {% endmatch %}
+                        <td>{{ job["req_mem"] }}GB</td>
+                        {% match div_two_i32s_into_f32(job["used_mem"], job["req_mem"]) %}
+                            {% when Ok with (used_mem_per_req) %}
+                                <td>{{ used_mem_per_req }}</td>
+                            {% when Err with (_) %}
+                                <td>NaN</td>
+                        {% endmatch %}
+                        <td>{{ job["used_walltime"] }}</td>
+                        <td>{{ timestamp_to_date(job["end_time"]) }}</td>
+                        <td></td>
+                        <td>
+                            <a href="stats?id={{ job["pbs_id"] }}">
+                                <button class="table-button">View Detailed Stats</button>
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </table>
+            </div>
+        {% when None %}
+    {% endmatch %}
+{% endblock %}

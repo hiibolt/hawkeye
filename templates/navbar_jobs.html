@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block body %}
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Left Navigation Bar -->
+        <nav class="navbar" id="navbar">
+            {% block navbar %}{% endblock %}
+        </nav>
+
+        <!-- Job Display Area -->
+        <main class="job-display">
+            <h2 class="job-section-header">
+                {{ header }}
+            </h2>
+            <section class="job-card-container">
+                {% block jobs %}{% endblock %}
+            </section>
+            {% match alert %}
+                {% when Some with (alert) %}
+                    <p id="alert-footer" style="text-align:center">
+                        {{ alert }}
+                    </p>
+                {% when None %}
+            {% endmatch %}
+        </main>
+        <div class="topGradient"></div>
+    </div>
+{% endblock %}

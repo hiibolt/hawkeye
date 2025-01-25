@@ -229,10 +229,11 @@ impl DB {
             additional_filters.push_str(&format!(" AND name = ?{}", params.len() + 1));
             params.push(filter_name.to_owned());
         }
-        // Make sure that the job is before or on the specified date
+        // Make sure that the job is before or on the specified date,
+        //  OR has not completed (state = R).
         if let Some(filter_date) = filter_date {
             eprintln!("{}", format!("Filtering by date: {filter_date}").green());
-            additional_filters.push_str(&format!(" AND start_time >= ?{}", params.len() + 1));
+            additional_filters.push_str(&format!(" AND (start_time >= ?{} OR state = 'R')", params.len() + 1));
             params.push(filter_date.to_owned());
         }
 
@@ -278,30 +279,46 @@ impl DB {
         if let Some(filter_state) = filter_state {
             additional_filters.push_str("state = ?1");
             params.push(filter_state);
-        } else {
-            additional_filters.push_str("state = 'R'");
         }
         if let Some(filter_queue) = filter_queue {
-            additional_filters.push_str(&format!(" AND queue = ?{}", params.len() + 1));
+            if !additional_filters.is_empty() {
+                additional_filters.push_str(" AND ");
+            }
+            additional_filters.push_str(&format!("queue = ?{}", params.len() + 1));
             params.push(filter_queue);
         }
         if let Some(filter_owner) = filter_owner {
-            additional_filters.push_str(&format!(" AND owner = ?{}", params.len() + 1));
+            if !additional_filters.is_empty() {
+                additional_filters.push_str(" AND ");
+            }
+            additional_filters.push_str(&format!("owner = ?{}", params.len() + 1));
             params.push(filter_owner);
         }
         if let Some(filter_name) = filter_name {
-            additional_filters.push_str(&format!(" AND name = ?{}", params.len() + 1));
+            if !additional_filters.is_empty() {
+                additional_filters.push_str(" AND ");
+            }
+            additional_filters.push_str(&format!("name = ?{}", params.len() + 1));
             params.push(filter_name);
         }
-        // Make sure that the job is before or on the specified date
+        // Make sure that the job is before or on the specified date,
+        //  OR has not completed (state = R).
         if let Some(filter_date) = filter_date {
+            if !additional_filters.is_empty() {
+                additional_filters.push_str(" AND ");
+            }
             eprintln!("{}", format!("Filtering by date: {filter_date}").green());
-            additional_filters.push_str(&format!(" AND start_time >= ?{}", params.len() + 1));
+            additional_filters.push_str(&format!("(start_time >= ?{} OR state = 'R')", params.len() + 1));
             params.push(filter_date);
         }
 
+        // If there were any filters, add the 'WHERE' keyword
+        if !additional_filters.is_empty() {
+            additional_filters = format!(" WHERE {}", additional_filters);
+        }
+
         //  ORDER BY start_time DESC
-        let mut stmt = self.conn.prepare(&format!("SELECT * FROM Jobs WHERE {}", additional_filters))?;
+        let mut stmt = self.conn.prepare(&format!("SELECT * FROM Jobs{}", additional_filters))?;
         let rows = stmt.query_map(params_from_iter(params), |row| {
             Ok(BTreeMap::from_iter(vec![
                 ("pbs_id".to_string(), row.get::<_, i32>(0)?.to_string()),
@@ -335,7 +352,7 @@ impl DB {
         }
     }
 
-    pub fn get_group_jobs (
+    pub fn _get_group_jobs (
         &mut self,
         filter_state: Option<&String>,
         filter_queue: Option<&String>,
@@ -362,10 +379,11 @@ impl DB {
             additional_filters.push_str(&format!(" AND name = ?{}", params.len() + 1));
             params.push(filter_name.to_owned());
         }
-        // Make sure that the job is before or on the specified date
+        // Make sure that the job is before or on the specified date,
+        //  OR has not completed (state = R).
         if let Some(filter_date) = filter_date {
             eprintln!("{}", format!("Filtering by date: {filter_date}").green());
-            additional_filters.push_str(&format!(" AND start_time >= ?{}", params.len() + 1));
+            additional_filters.push_str(&format!(" AND (start_time >= ?{} OR state = 'R')", params.len() + 1));
             params.push(filter_date.to_owned());
         }
 
@@ -411,6 +429,38 @@ impl DB {
         }
     }
 
+    pub fn get_job (
+        &mut self,
+        pbs_id: i32,
+    ) -> Result<BTreeMap<String, String>> {
+        let mut stmt = self.conn.prepare("SELECT * FROM Jobs WHERE pbs_id = ?1")?;
+        let row = stmt.query_row([pbs_id], |row| {
+            Ok(BTreeMap::from_iter(vec![
+                ("pbs_id".to_string(), row.get::<_, i32>(0)?.to_string()),
+                ("name".to_string(), row.get::<_, String>(1)?),
+                ("owner".to_string(), row.get::<_, String>(2)?),
+                ("state".to_string(), row.get::<_, String>(3)?),
+                ("start_time".to_string(), row.get::<_, i32>(4)?.to_string()),
+                ("queue".to_string(), row.get::<_, String>(5)?),
+                ("nodes".to_string(), row.get::<_, String>(6)?),
+                ("req_mem".to_string(), row.get::<_, f64>(7)?.to_string()),
+                ("req_cpus".to_string(), row.get::<_, i32>(8)?.to_string()),
+                ("req_gpus".to_string(), row.get::<_, i32>(9)?.to_string()),
+                ("req_walltime".to_string(), row.get::<_, String>(10)?),
+                ("req_select".to_string(), row.get::<_, String>(11)?),
+                ("mem_efficiency".to_string(), row.get::<_, f64>(12)?.to_string()),
+                ("walltime_efficiency".to_string(), row.get::<_, f64>(13)?.to_string()),
+                ("cpu_efficiency".to_string(), row.get::<_, f64>(14)?.to_string()),
+                ("used_cpu_percent".to_string(), row.get::<_, f64>(15)?.to_string()),
+                ("used_mem".to_string(), row.get::<_, f64>(16)?.to_string()),
+                ("used_walltime".to_string(), row.get::<_, String>(17)?),
+                ("end_time".to_string(), row.get::<_, i32>(18)?.to_string()),
+            ]))
+        }).context("Failed to get row!")?;
+    
+        Ok(row)
+    }
+
     pub fn get_job_stats (
         &mut self,
         pbs_id: i32,
@@ -448,7 +498,7 @@ impl DB {
         Ok(rows.flatten().collect())
     }
 
-    pub fn is_user_able_to_view_stats (
+    pub fn _is_user_able_to_view_stats (
         &mut self,
         user: &str,
         pbs_id: i32,
@@ -456,7 +506,7 @@ impl DB {
         // Firstly, if the user is in the `hpc` group,
         //  they are allowed to view advanced stats for
         //  any job.
-        if self.is_user_admin(user)? {
+        if self._is_user_admin(user)? {
             return Ok(true);
         }
 
@@ -469,7 +519,7 @@ impl DB {
         Ok(count > 0)
     }
 
-    pub fn is_user_in_group (
+    pub fn _is_user_in_group (
         &mut self,
         user: &str,
         group: &str,
@@ -480,11 +530,11 @@ impl DB {
         Ok(count > 0)
     }
 
-    pub fn is_user_admin (
+    pub fn _is_user_admin (
         &mut self,
         user: &str,
     ) -> Result<bool> {
-        self.is_user_in_group(user, "hpc")
+        self._is_user_in_group(user, "hpc")
     }
 
     pub async fn login (

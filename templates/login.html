@@ -1,12 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - CRCD Batchmon</title>
-    <link rel="stylesheet" href="public/styles/styles.css">
-</head>
-<body>
+{% extends "base.html" %}
+
+{% block body %}
     <div class="login-container">
         <div class="branding">
             <h2>CRCD Batchmon Login</h2>
@@ -20,11 +14,10 @@
             
             <button id="login-button" type="submit"><b>Login</b></button>
         </form>
-        <p class="login-alert" id="alert-footer" style="text-align:center">
-            <!-- Populated by JS -->
-        </p>
+        {% if failed %}
+            <p class="login-alert" id="alert-footer" style="text-align:center">
+                <i>Invalid Login! Please Try Again.</i>
+            </p>
+        {% endif %}
     </div>
-
-    <script src="public/scripts/login.js"></script>
-</body>
-</html>
+{% endblock %}
