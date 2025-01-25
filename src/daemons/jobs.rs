@@ -26,7 +26,7 @@ pub async fn grab_old_jobs_thread (
         &remote_username,
         &remote_hostname,
         "jmanl",
-        vec![&user, "month", "raw"],
+        vec![&user, "all", "raw"],
         true
     ).await
         .context("Couldn't get output from `jmanl` command!")?;
