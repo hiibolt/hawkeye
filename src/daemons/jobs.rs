@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use colored::Colorize;
 use futures::future::join_all;
 use regex::Regex;
@@ -26,7 +26,7 @@ pub async fn grab_old_jobs_thread (
         &remote_username,
         &remote_hostname,
         "jmanl",
-        vec![&user, "all", "raw"],
+        vec![&user, "year", "raw"],
         true
     ).await
         .context("Couldn't get output from `jmanl` command!")?;
@@ -46,12 +46,24 @@ pub async fn grab_old_jobs_thread (
         chunks_map.insert(job_id, num_chunks);
     }
 
-    let input = old_jobs_raw.split("Raw records::\r\n")
+    let mut use_clrf = false;
+    let input = if let Some(input) = old_jobs_raw.split("Raw records::\n")
         .nth(1)
-        .context("Invalid input!")?;
-
-    let jobs = input.split("\r\n")
-        .filter(|line| !line.is_empty())
+    {
+        input
+    } else {
+        eprintln!("{}", "Couldn't use LF as delimiter! Trying CLRF...".yellow());
+        use_clrf = true;
+        old_jobs_raw.split("Raw records::\r\n")
+            .nth(1)
+            .ok_or(anyhow!("Invalid input! INput: {old_jobs_raw:?}"))?
+    };
+    
+    let jobs = if use_clrf { 
+        input.split("\r\n")
+    } else {
+        input.split("\n") 
+    }.filter(|line| !line.is_empty())
         .flat_map(|job_line| {
             match jmanl_job_str_to_btree(
                 job_line.split(';')
