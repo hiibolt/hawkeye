@@ -92,7 +92,7 @@
                     <th>Req/Used Memory</th>
                     <th>Used Walltime</th>
                     <th>End Date</th>
-                    <th>Exit Status</th> <!-- leave blank on table -->
+                    <th>Exit Status</th>
                     <th>More</th>
                 </tr>
                 {% for job in jobs %}
@@ -100,7 +100,7 @@
                         <td><b>{{ job["pbs_id"] }}</b></td>
                         <td>{{ job["req_cpus"] }}</td>
                         <td>{{ job["req_nodes"] }}</td>
-                        <td></td>
+                        <td>{{ job["chunks"] }}</td>
                         <td>{{ job["used_mem"] }}GB</td>
                         {% match div_two_i32s_into_f32(job["used_mem"], job["req_cpus"]) %}
                             {% when Ok with (used_mem_per_cpu) %}
@@ -117,7 +117,7 @@
                         {% endmatch %}
                         <td>{{ job["used_walltime"] }}</td>
                         <td>{{ timestamp_to_date(job["end_time"]) }}</td>
-                        <td></td>
+                        <td>{{ job["exit_status"] }}</td>
                         <td>
                             <a href="stats?id={{ job["pbs_id"] }}">
                                 <button class="table-button">View Detailed Stats</button>

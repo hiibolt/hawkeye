@@ -118,7 +118,7 @@ pub async fn stats(
             Some("You are not logged in!".to_string())
         },
         username,
-        title: String::from("Job Stats - NIU"),
+        title: String::from("Job Stats - CRCD Batchmon"),
         header: if let Some(ref id) = id_query {
             format!("Extended Job Stats - Job ID {id}")
         } else {

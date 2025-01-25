@@ -13,6 +13,7 @@ colored = "3.0.0"
 futures = "0.3.31"
 http = "1.2.0"
 openssh = { version = "0.11.2", features = [ "native-mux" ] }
+regex = "1.11.1"
 rusqlite = "0.33.0"
 serde = "1.0.217"
 time = "0.3.37"

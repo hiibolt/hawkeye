@@ -33,7 +33,7 @@ pub async fn login(
         })?;
 
     let template = LoginPageTemplate {
-        title: "Login - NIU Batchmon".to_string(),
+        title: "Login - CRCD Batchmon".to_string(),
         username: None,
         failed: params.get("invalid")
             .and_then(|st| {

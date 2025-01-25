@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use anyhow::{Context, Result};
 use colored::Colorize;
 use futures::future::join_all;
+use regex::Regex;
 
 use crate::routes::AppState;
 
@@ -30,6 +31,21 @@ pub async fn grab_old_jobs_thread (
     ).await
         .context("Couldn't get output from `jmanl` command!")?;
 
+    // Extract the job ID and # of chunks from the following:
+    //  (and nothing else, the rest is garbage)
+    // 'Job 31940.cm-z1784300-mdmech15 (180 CPUs, 15 node(s), 15 chunk(s))'
+    let formatted_jmantl_re = Regex::new(r"Job (\d+)\.cm-.+-.+ \(\d+ CPUs, \d+ node\(s\), (\d+) chunk\(s\)\)")
+        .context("Couldn't compile regex!")?;
+
+    // Create a BTreeMap from the job line
+    let mut chunks_map = BTreeMap::new();
+    for (_, [job_id, num_chunks]) in formatted_jmantl_re
+        .captures_iter(&old_jobs_raw)
+        .map(|c| c.extract())
+    {
+        chunks_map.insert(job_id, num_chunks);
+    }
+
     let input = old_jobs_raw.split("Raw records::\r\n")
         .nth(1)
         .context("Invalid input!")?;
@@ -46,7 +62,25 @@ pub async fn grab_old_jobs_thread (
                         .collect::<Vec<&str>>()
                         .join(";")
             ) {
-                Ok(job) => Some(job),
+                Ok(job) => {
+                    let job_id = if let Some(job_id) = job.get("job_id") {
+                        job_id
+                    } else {
+                        eprintln!("{}", format!("Couldn't get job ID from `jmanl` job line: {job_line}!").red());
+                        return None;
+                    };
+
+                    let num_chunks = chunks_map.get((*job_id).as_str())
+                        .unwrap_or(&"?");
+
+                    let mut job = job.clone();
+                    job.insert(
+                        "chunks".to_string(),
+                        num_chunks.to_string()
+                    );
+
+                    Some(job)
+                },
                 Err(e) => {
                     eprintln!("{}", format!("Couldn't parse `jmanl` job line: {job_line}! Error: {e:?}").red());
                     None
@@ -159,7 +193,7 @@ async fn grab_jobs_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
     ).await
         .context("[ ERROR ] Failed to run remote command!")?;
 
-    let job_strs: Vec<&str> = jobstat_output.split("----- --------- ------- ------- ----- -----------------------------------------------------------------------------------------------------------------------------\r\n")
+    let job_strs: Vec<&str> = jobstat_output.split("--------------------\r\n")
         .nth(1)
         .with_context(|| format!("Invalid input! Input:\n{jobstat_output}"))?
         .split("\r\n\r\n")

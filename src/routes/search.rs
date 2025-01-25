@@ -140,7 +140,7 @@ pub async fn search(
             }
         },
         username,
-        title: String::from("Active Jobs - NIU"),
+        title: String::from("Search - CRCD Batchmon"),
         header: String::from("Search"),
         jobs,
 

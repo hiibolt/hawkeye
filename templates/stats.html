@@ -27,7 +27,7 @@
         <div class="job-card">        
             <div class="job-header">
                 <p>
-                    <b>{{ job["name"] }} - {{ job["pbs_id"] }} ({{ job["state"] }})</b>
+                    <b>{{ job["name"] }} - {{ job["pbs_id"] }} ({% if job["state"] == "E" %}{{ job["state"] }} - Exit Status: '{{ job["exit_status"] }}'{% else %}{{ job["state"] }}{% endif %})</b>
                     <br>
                     Submitted by <a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a> on <b>{{ timestamp_to_date(job["start_time"]) }}</b>
                 </p>
@@ -74,7 +74,7 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td></td>
+                        <td>{{ job["chunks"] }}</td>
                         <td>{{ job["used_cpu_percent"] }}%</td>
                         <td>{{ job["used_mem"] }}GB</td>
                         {% match div_two_i32s_into_f32(job["used_mem"], job["req_cpus"]) %}

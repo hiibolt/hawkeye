@@ -132,7 +132,7 @@ pub async fn completed(
         // Cool compiler magic here :3c (avoids cloning)
         alert: if username.is_none() { Some("You are not logged in!".to_string()) } else { None },
         username,
-        title: String::from("Completed Jobs - NIU"),
+        title: String::from("Completed Jobs - CRCD Batchmon"),
         header,
         jobs,
 

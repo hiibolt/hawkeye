@@ -108,7 +108,7 @@ pub async fn running(
     let jobs = jobs.into_iter().rev().collect();
     let template = RunningPageTemplate {
         username,
-        title: String::from("Active Jobs - NIU"),
+        title: String::from("Active Jobs - CRCD Batchmon"),
         header: String::from("All Running Jobs on Metis"),
         alert: None,
         jobs,

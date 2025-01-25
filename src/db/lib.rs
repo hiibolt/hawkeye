@@ -69,6 +69,8 @@ impl DB {
                 used_mem REAL NOT NULL,
                 used_walltime TEXT NOT NULL,
                 end_time INTEGER NOT NULL,
+                chunks TEXT NOT NULL,
+                exit_status TEXT NOT NULL,
                 FOREIGN KEY (owner) REFERENCES Users(owner)
             )",
             [],
@@ -98,7 +100,7 @@ impl DB {
         
         // Add the job
         self.conn.execute(
-            "INSERT OR REPLACE INTO Jobs (pbs_id, name, owner, state, start_time, queue, nodes, req_mem, req_cpus, req_gpus, req_walltime, req_select, mem_efficiency, walltime_efficiency, cpu_efficiency, used_cpu_percent, used_mem, used_walltime, end_time) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
+            "INSERT OR REPLACE INTO Jobs (pbs_id, name, owner, state, start_time, queue, nodes, req_mem, req_cpus, req_gpus, req_walltime, req_select, mem_efficiency, walltime_efficiency, cpu_efficiency, used_cpu_percent, used_mem, used_walltime, end_time, chunks, exit_status) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
             params![
                 job["job_id"],
                 job["Job_Name"],
@@ -119,6 +121,8 @@ impl DB {
                 job["resources_used.mem"],
                 job["resources_used.walltime"],
                 job.get("end_time").unwrap_or(&i32::MAX.to_string()),
+                job.get("chunks").unwrap_or(&String::from("Not Yet Done")),
+                job.get("Exit_status").unwrap_or(&String::from("Not Yet Done"))
             ],
         )?;
         
@@ -259,6 +263,8 @@ impl DB {
                 ("used_mem".to_string(), row.get::<_, f64>(16)?.to_string()),
                 ("used_walltime".to_string(), row.get::<_, String>(17)?),
                 ("end_time".to_string(), row.get::<_, i32>(18)?.to_string()),
+                ("chunks".to_string(), row.get::<_, String>(19)?),
+                ("exit_status".to_string(), row.get::<_, String>(20)?),
             ]))
         }).context("Failed to get rows!")?;
     
@@ -340,6 +346,8 @@ impl DB {
                 ("used_mem".to_string(), row.get::<_, f64>(16)?.to_string()),
                 ("used_walltime".to_string(), row.get::<_, String>(17)?),
                 ("end_time".to_string(), row.get::<_, i32>(18)?.to_string()),
+                ("chunks".to_string(), row.get::<_, String>(19)?),
+                ("exit_status".to_string(), row.get::<_, String>(20)?),
             ]))
         });
 
@@ -413,6 +421,8 @@ impl DB {
                 ("used_mem".to_string(), row.get::<_, f64>(16)?.to_string()),
                 ("used_walltime".to_string(), row.get::<_, String>(17)?),
                 ("end_time".to_string(), row.get::<_, i32>(18)?.to_string()),
+                ("chunks".to_string(), row.get::<_, String>(19)?),
+                ("exit_status".to_string(), row.get::<_, String>(20)?),
             ]))
         });
     
@@ -455,6 +465,8 @@ impl DB {
                 ("used_mem".to_string(), row.get::<_, f64>(16)?.to_string()),
                 ("used_walltime".to_string(), row.get::<_, String>(17)?),
                 ("end_time".to_string(), row.get::<_, i32>(18)?.to_string()),
+                ("chunks".to_string(), row.get::<_, String>(19)?),
+                ("exit_status".to_string(), row.get::<_, String>(20)?),
             ]))
         }).context("Failed to get row!")?;
     
