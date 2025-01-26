@@ -17,7 +17,6 @@ use axum::{
     routing::{get, post}, Router
 };
 use tower_sessions::{cookie::Key, Expiry, MemoryStore, SessionManagerLayer};
-use time::Duration;
 use tracing::info;
 use tracing_subscriber;
 
@@ -56,7 +55,7 @@ async fn main() -> Result<()> {
     let session_store = MemoryStore::default();
     // E.g. sessions expire after 30 minutes of inactivity
     let session_layer = SessionManagerLayer::new(session_store)
-        .with_expiry(Expiry::OnInactivity(Duration::minutes(30)))
+        .with_expiry(Expiry::OnSessionEnd)
         .with_secure(true)
         .with_private(
             Key::try_generate()
