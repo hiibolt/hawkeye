@@ -1,21 +1,21 @@
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::{Context, Result, anyhow};
-use colored::Colorize;
-use futures::future::join_all;
 use regex::Regex;
+use tracing::{error, info};
+use tokio::task::JoinSet;
+use tokio::sync::Mutex;
 
 use crate::routes::AppState;
-
 use super::super::{
     remote::command::*,
     parsing::jobs::*,
 };
-use tokio::sync::Mutex;
 
 const DEFAULT_JOBSTAT_PERIOD: u64 = 60 * 5;
 const DEFAULT_OLD_JOB_PERIOD: u64 = 60 * 30;
 
+#[tracing::instrument]
 pub async fn grab_old_jobs_thread (
     app: Arc<Mutex<AppState>>,
     remote_username: String,
@@ -33,7 +33,6 @@ pub async fn grab_old_jobs_thread (
 
     // Extract the job ID and # of chunks from the following:
     //  (and nothing else, the rest is garbage)
-    // 'Job 31940.cm-z1784300-mdmech15 (180 CPUs, 15 node(s), 15 chunk(s))'
     let formatted_jmantl_re = Regex::new(r"Job (\d+)\.cm-.+-.+ \(\d+ CPUs, \d+ node\(s\), (\d+) chunk\(s\)\)")
         .context("Couldn't compile regex!")?;
 
@@ -52,7 +51,7 @@ pub async fn grab_old_jobs_thread (
     {
         input
     } else {
-        eprintln!("{}", "Couldn't use LF as delimiter! Trying CLRF...".yellow());
+        info!("Couldn't use LF as delimiter! Trying CLRF...");
         use_clrf = true;
         old_jobs_raw.split("Raw records::\r\n")
             .nth(1)
@@ -78,7 +77,7 @@ pub async fn grab_old_jobs_thread (
                     let job_id = if let Some(job_id) = job.get("job_id") {
                         job_id
                     } else {
-                        eprintln!("{}", format!("Couldn't get job ID from `jmanl` job line: {job_line}!").red());
+                        error!("Couldn't get job ID from `jmanl` job line: {job_line}!");
                         return None;
                     };
 
@@ -94,7 +93,7 @@ pub async fn grab_old_jobs_thread (
                     Some(job)
                 },
                 Err(e) => {
-                    eprintln!("{}", format!("Couldn't parse `jmanl` job line: {job_line}! Error: {e:?}").red());
+                    error!(%e, "Couldn't parse `jmanl` job line: {job_line}!");
                     None
                 }
             }
@@ -120,6 +119,7 @@ pub async fn grab_old_jobs_thread (
 
     Ok(())
 }
+#[tracing::instrument]
 async fn grab_old_jobs_helper (
     app: Arc<Mutex<AppState>>
 ) -> Result<()> {
@@ -135,27 +135,25 @@ async fn grab_old_jobs_helper (
         (state.remote_username.clone(), state.remote_hostname.clone())
     };
 
-    let mut handles = vec![];
+    let mut tasks = JoinSet::new();
     for user in users {
         let app = app.clone();
         let remote_username = remote_username.clone();
         let remote_hostname = remote_hostname.clone();
         let user_cloned = user.clone();
-        let handle = tokio::spawn(async move {
+        tasks.spawn(async move {
             if let Err(e) = grab_old_jobs_thread(
                 app,
                 remote_username,
                 remote_hostname,
                 user_cloned
             ).await {
-                eprintln!("{}", format!("Couldn't grab old jobs for {user}! Error: {e:?}").red());
+                error!(%e, "Couldn't grab old jobs for {user}!");
             }
         });
-
-        handles.push(handle);
     }
 
-    join_all(handles).await;
+    tasks.join_all().await;
 
     Ok(())
 }
@@ -166,29 +164,29 @@ pub async fn old_jobs_daemon (
         .unwrap_or_else(|_| DEFAULT_OLD_JOB_PERIOD.to_string())
         .parse::<u64>()
         .expect("Invalid `OLD_JOBS_DAEMON_PERIOD` value!");
-    eprintln!("{}", format!("[ Old job period: {old_job_period} ]").blue());
+    info!("[ Old job period: {old_job_period} ]");
 
     // Wait for the web server to start up
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     loop {
-        eprintln!("{}", "[ Pulling old jobs... ]".green());
+        info!("[ Pulling old jobs... ]");
         if let Err(e) = grab_old_jobs_helper( app.clone() ).await {
-            eprintln!("{}", format!("[ ERROR ] Failed to grab old jobs! Error: {e:?}").red());
+            error!(%e, "Failed to grab old jobs!");
 
             tokio::time::sleep(tokio::time::Duration::from_secs(
                 old_job_period
             )).await;
             continue;
         };
-        eprintln!("{}", "[ Old jobs pulled! ]".green());
+        info!("[ Old jobs pulled! ]");
 
         tokio::time::sleep(tokio::time::Duration::from_secs(
             old_job_period
         )).await;
     }
 }
-
+#[tracing::instrument]
 async fn grab_jobs_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
     let (username, hostname) = {
         let state = app.lock().await;
@@ -203,7 +201,7 @@ async fn grab_jobs_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
         vec!["-anL"],
         true
     ).await
-        .context("[ ERROR ] Failed to run remote command!")?;
+        .context("Failed to run remote command!")?;
 
     let job_strs: Vec<&str> = jobstat_output.split("--------------------\r\n")
         .nth(1)
@@ -213,10 +211,14 @@ async fn grab_jobs_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
 
     let jobs = job_strs.iter()
         .flat_map(|job| {
+            if job.starts_with("nodes: ") {
+                return None;
+            }
             match jobstat_job_str_to_btree(job) {
                 Ok(job) => Some(job),
                 Err(e) => {
-                    eprintln!("{}", format!("Couldn't parse `jobstat` job line: {job}! Error: {e:?}").red());
+                    error!(%e, "Couldn't parse `jobstat` job line!");
+                    error!("Job line: {job}");
                     None
                 }
             }
@@ -231,37 +233,37 @@ async fn grab_jobs_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
     }
 
     // Mark jobs that are no longer active as 'S' (stopped)
-    eprintln!("{}", "[ Marking completed jobs... ]".green());
+    info!("Marking completed jobs...");
     app.lock().await
         .db
         .mark_completed_jobs(&jobs)
         .context("Couldn't mark complete jobs!")?;
-    eprintln!("{}", "[ Completed jobs marked! ]".green());
+    info!("Completed jobs marked!");
 
     Ok(())
 }
-
+#[tracing::instrument]
 pub async fn jobs_daemon ( app: Arc<Mutex<AppState>> ) {
     let jobstat_period = std::env::var("JOBS_DAEMON_PERIOD")
         .unwrap_or_else(|_| DEFAULT_JOBSTAT_PERIOD.to_string())
         .parse::<u64>()
         .expect("Invalid `JOBS_DAEMON_PERIOD` value!");
-    eprintln!("{}", format!("[ Jobstat period: {jobstat_period} ]").blue());
+    info!("[ Jobstat period: {jobstat_period} ]");
 
     // Wait for the web server to start up
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     
     loop {
-        eprintln!("{}", "[ Pulling jobs... ]".green());
+        info!("[ Pulling jobs... ]");
         if let Err(e) = grab_jobs_helper( app.clone() ).await {
-            eprintln!("[ ERROR ] Failed to run remote command! Error: {e:?}");
+            error!(%e, "Failed to run remote command!");
 
             tokio::time::sleep(tokio::time::Duration::from_secs(
                 jobstat_period
             )).await;
             continue;
         };
-        eprintln!("{}", "[ Jobs pulled! ]".green());
+        info!("[ Jobs pulled! ]");
 
         tokio::time::sleep(tokio::time::Duration::from_secs(
             jobstat_period

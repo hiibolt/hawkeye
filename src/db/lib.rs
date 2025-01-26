@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 
 use anyhow::{Context, Result, anyhow};
 use rusqlite::{params, params_from_iter, Connection};
-use colored::Colorize;
+use tracing::{info, error};
 
 use super::super::remote::auth::verify_login;
 
@@ -165,6 +165,7 @@ impl DB {
     
     /// Update all jobs in state 'R' that are *not* in the current list of active jobs.
     /// We mark them as 'S' in the database (i.e., 'stopped' or 'completed').
+    #[tracing::instrument]
     pub fn mark_completed_jobs(
         &mut self,
         active_jobs: &[BTreeMap<&str, String>],
@@ -184,7 +185,7 @@ impl DB {
             let pbs_id = row_result?;
             // If a job's ID is *not* in the active set, we assume it completed
             if !active_ids.contains(&pbs_id) {
-                eprintln!("{}", format!("[ Marking job {} as completed... ]", pbs_id).green());
+                info!("[ Marking job {} as completed... ]", pbs_id);
 
                 let now = SystemTime::now();
                 let secs_since_epoch = now.duration_since(UNIX_EPOCH)
@@ -206,6 +207,7 @@ impl DB {
         Ok(())
     }
 
+    #[tracing::instrument]
     pub fn get_user_jobs(
         &mut self,
         username: &str,
@@ -236,8 +238,8 @@ impl DB {
         // Make sure that the job is before or on the specified date,
         //  OR has not completed (state = R).
         if let Some(filter_date) = filter_date {
-            eprintln!("{}", format!("Filtering by date: {filter_date}").green());
-            additional_filters.push_str(&format!(" AND (start_time >= ?{} OR state = 'R')", params.len() + 1));
+            info!("Filtering by date: {filter_date}");
+            additional_filters.push_str(&format!(" AND start_time >= ?{}", params.len() + 1));
             params.push(filter_date.to_owned());
         }
 
@@ -271,7 +273,8 @@ impl DB {
         Ok(rows.flatten().collect())
     }
 
-    pub fn get_all_running_jobs (
+    #[tracing::instrument]
+    pub fn get_all_jobs (
         &mut self,
         filter_state: Option<&String>,
         filter_queue: Option<&String>,
@@ -313,8 +316,8 @@ impl DB {
             if !additional_filters.is_empty() {
                 additional_filters.push_str(" AND ");
             }
-            eprintln!("{}", format!("Filtering by date: {filter_date}").green());
-            additional_filters.push_str(&format!("(start_time >= ?{} OR state = 'R')", params.len() + 1));
+            info!("Filtering by date: {filter_date}");
+            additional_filters.push_str(&format!("(start_time >= ?{})", params.len() + 1));
             params.push(filter_date);
         }
 
@@ -354,12 +357,13 @@ impl DB {
         match rows {
             Ok(rows) => Ok(rows.flatten().collect()),
             Err(e) => {
-                eprintln!("{}", format!("Failed to get rows! Error: {e:?}").red());
+                error!(%e, "Failed to get rows!");
                 Err(anyhow!("Failed to get rows! Error: {e:?}"))
             }
         }
     }
 
+    #[tracing::instrument]
     pub fn _get_group_jobs (
         &mut self,
         filter_state: Option<&String>,
@@ -390,14 +394,14 @@ impl DB {
         // Make sure that the job is before or on the specified date,
         //  OR has not completed (state = R).
         if let Some(filter_date) = filter_date {
-            eprintln!("{}", format!("Filtering by date: {filter_date}").green());
-            additional_filters.push_str(&format!(" AND (start_time >= ?{} OR state = 'R')", params.len() + 1));
+            info!("Filtering by date: {filter_date}");
+            additional_filters.push_str(&format!(" AND start_time >= ?{}", params.len() + 1));
             params.push(filter_date.to_owned());
         }
 
-        eprintln!("{}", format!("Filtering by group: {group}").green());
-        eprintln!("{}", format!("Additional filters: '{additional_filters}'").green());
-        eprintln!("{}", format!("Params: {params:?}").green());
+        info!("Filtering by group: {group}");
+        info!("Additional filters: '{additional_filters}'");
+        info!("Params: {params:?}");
 
         let mut stmt = self.conn.prepare(&format!("SELECT * FROM Jobs WHERE owner IN (SELECT user_name FROM UserGroups WHERE group_name = ?1){}", additional_filters))?;
         let rows = stmt.query_map(params_from_iter(params), |row| {
@@ -429,11 +433,11 @@ impl DB {
         match rows {
             Ok(rows) => {
                 let ret: Vec<BTreeMap<String, String>> = rows.flatten().collect();
-                eprintln!("{}", format!("Returning {} rows!", ret.len()).green());
+                info!("Returning {} rows!", ret.len());
                 Ok(ret)
             },
             Err(e) => {
-                eprintln!("{}", format!("Failed to get rows! Error: {e:?}").red());
+                error!(%e, "Failed to get rows!");
                 Err(anyhow!("Failed to get rows! Error: {e:?}"))
             }
         }
@@ -500,7 +504,7 @@ impl DB {
         Ok(rows.flatten().collect())
     }
     
-    pub fn get_user_groups (
+    pub fn _get_user_groups (
         &mut self,
         username: &str,
     ) -> Result<Vec<String>> {

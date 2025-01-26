@@ -5,19 +5,19 @@ use axum::{
     http::StatusCode
 };
 
-pub mod auth;
+use anyhow::Result;
+use tokio::io::AsyncReadExt;
+use axum::http::header;
 
-pub mod running;
-pub mod login;
-pub mod completed;
-pub mod search;
-pub mod stats;
 
+pub mod api;
+pub mod pages;
+
+#[derive(Debug)]
 pub struct AppState {
     pub remote_username: String,
     pub remote_hostname: String,
-    pub db: super::DB,
-    pub frontend_base: String
+    pub db: super::DB
 }
 
 struct HtmlTemplate<T>(T);
@@ -36,4 +36,29 @@ impl<T> IntoResponse for HtmlTemplate<T>
                 .into_response(),
         }
     }
+}
+
+pub async fn get_favicon ( ) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let mut file = match tokio::fs::File::open("public/images/favicon.ico").await {
+        Ok(file) => file,
+        Err(err) => return Err((StatusCode::NOT_FOUND, format!("File not found: {}", err))),
+    };
+    
+    // Read the file into a byte array
+    let mut contents: Vec<u8> = Vec::new();
+    file.read_to_end(&mut contents).await
+        .map_err(|e| (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Failed to read file: {}", e)
+        ))?;
+
+    let headers = [
+        (header::CONTENT_TYPE, "image/x-icon"),
+        (
+            header::CONTENT_DISPOSITION,
+            "attachment; filename=\"favicon.ico\""
+        ),
+    ];
+
+    Ok((headers, contents))
 }

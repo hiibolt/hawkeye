@@ -1,16 +1,16 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use colored::Colorize;
-use futures::future::join_all;
-use tokio::task::JoinHandle;
+use tokio::task::JoinSet;
 use tokio::sync::Mutex;
+use tracing::{info, error};
 
 use crate::routes::AppState;
 use super::super::remote::command::*;
 
 const GROUPS_PERIOD: u64 = 60 * 60;
 
+#[tracing::instrument]
 pub async fn grab_group_thread (
     app: Arc<Mutex<AppState>>,
     remote_username: String,
@@ -24,7 +24,7 @@ pub async fn grab_group_thread (
         vec![&user],
         false
     ).await
-        .context("[ ERROR ] Failed to run remote command!")?;
+        .context("Failed to run remote command!")?;
 
     let groups: Vec<&str> = group_output
         .split(" : ")
@@ -32,7 +32,7 @@ pub async fn grab_group_thread (
         .context("Invalid output from the `groups` command!")?
         .split_whitespace()
         .collect();
-    eprintln!("Got groups for `{user}`: {groups:?}");
+    info!("Got groups for `{user}`: {groups:?}");
 
     let db = &mut app.lock().await.db;
     for group in groups {
@@ -40,11 +40,11 @@ pub async fn grab_group_thread (
             .with_context(|| format!("Couldn't insert user {user} into group {group}!"))?;
     }
     
-    eprintln!("Inserted groups for `{user}`!");
+    info!("Inserted groups for `{user}`!");
 
     Ok(())
 }
-
+#[tracing::instrument]
 async fn grab_groups_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
     // Get a list of all users from the DB
     let users = app.lock().await
@@ -52,7 +52,7 @@ async fn grab_groups_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
         .get_users()
         .context("Couldn't get users!")?;
 
-    println!("[ Got Users ]: {users:?}");
+    info!("[ Got Users ]: {users:?}");
 
     let (remote_username, remote_hostname) = {
         let state = app.lock().await;
@@ -61,13 +61,13 @@ async fn grab_groups_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
     };
 
     // Spawn a task for each user, but collect the JoinHandles
-    let mut tasks: Vec<JoinHandle<()>> = Vec::new();
+    let mut tasks = JoinSet::new();
     for user in users {
         let app = app.clone();
         let remote_username = remote_username.clone();
         let remote_hostname = remote_hostname.clone();
         let user_cloned = user.clone();
-        let handle = tokio::spawn(async move {
+        tasks.spawn(async move {
             // We deliberately swallow the actual Result here, but you could propagate it
             if let Err(e) = grab_group_thread(
                 app,
@@ -75,19 +75,17 @@ async fn grab_groups_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
                 remote_hostname,
                 user_cloned
             ).await {
-                eprintln!("[ ERROR ] Failed to grab groups for {user}! Error: {e:?}");
+                error!(%e, "Failed to grab groups for {user}!");
             }
         });
-
-        tasks.push(handle);
     }
 
     // Await *all* tasks to finish
-    join_all(tasks).await;
+    tasks.join_all().await;
 
     Ok(())
 }
-
+#[tracing::instrument]
 pub async fn groups_daemon (
     app: Arc<Mutex<AppState>>
 ) {
@@ -95,7 +93,7 @@ pub async fn groups_daemon (
         .unwrap_or(GROUPS_PERIOD.to_string())
         .parse::<u64>()
         .expect("Invalid `GROUPS_DAEMON_PERIOD` value!");
-    eprintln!("{}", format!("[ Groups period: {groups_period} ]").blue());
+    info!("[ Groups period: {groups_period} ]");
 
     // Wait for the web server to start up
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
@@ -104,14 +102,14 @@ pub async fn groups_daemon (
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     loop {
-        eprintln!("{}", "[ Pulling groups... ]".green());
+        info!("[ Pulling groups... ]");
         if let Err(e) = grab_groups_helper( app.clone() ).await {
-            eprintln!("[ ERROR ] Failed to run remote command! Error: {e:?}");
+            error!(%e, "Failed to run remote command!");
 
             tokio::time::sleep(tokio::time::Duration::from_secs(groups_period)).await;
             continue;
         };
-        eprintln!("{}", "[ Groups pulled! ]".green());
+        info!("[ Groups pulled! ]");
 
         tokio::time::sleep(tokio::time::Duration::from_secs(
             groups_period

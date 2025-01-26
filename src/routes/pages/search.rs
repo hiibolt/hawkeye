@@ -1,20 +1,20 @@
-use super::{HtmlTemplate, AppState};
+use super::super::{HtmlTemplate, AppState};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
 use anyhow::{Context, Result};
 use tokio::sync::Mutex;
 use axum::{
-    extract::{Query, State}, response::IntoResponse
+    extract::{Query, State}, response::IntoResponse,
+    http::StatusCode
 };
-use colored::Colorize;
 use tower_sessions::Session;
-use http::StatusCode;
 use askama::Template;
+use tracing::{info, error};
 
 
-#[derive(Template)]
-#[template(path = "search.html")]
+#[derive(Template, Debug)]
+#[template(path = "pages/search.html")]
 struct SearchPageTemplate {
     username: Option<String>,
     title: String,
@@ -32,18 +32,19 @@ struct SearchPageTemplate {
     timestamp_to_date: fn(&&String) -> String,
     to_i32: fn(&&String) -> Result<i32>
 }
+#[tracing::instrument]
 pub async fn search(
     State(app): State<Arc<Mutex<AppState>>>,
     Query(params): Query<HashMap<String, String>>,
     session: Session,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    eprintln!("{}", "[ Got request to build running page...]".green());
+    info!("[ Got request to build the search page...]");
 
     // Extract the session username and query parameters
     let username = session.get::<String>("username")
         .await
         .map_err(|e| {
-            eprintln!("{}", format!("Couldn't get username from session! Error: {e:?}").red());
+            error!(%e, "Couldn't get username from session!");
             (StatusCode::UNAUTHORIZED, "Couldn't get username from session!".to_string())
         })?;
     let date_query = params.get("date")
@@ -78,7 +79,7 @@ pub async fn search(
             app.lock()
                 .await
                 .db
-                .get_all_running_jobs(
+                .get_all_jobs(
                     params.get("state"),
                     params.get("queue"),
                     params.get("user"),
@@ -87,7 +88,7 @@ pub async fn search(
                     false
                 )
                 .map_err(|e| {
-                    eprintln!("{}", format!("Couldn't get all jobs! Error: {e:?}").red());
+                    error!(%e, "Couldn't get all jobs!");
                     (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get all jobs!".to_string())
                 })?
         } else {

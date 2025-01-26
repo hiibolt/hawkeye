@@ -1,4 +1,4 @@
-use super::{HtmlTemplate, AppState};
+use super::super::{HtmlTemplate, AppState};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -7,14 +7,14 @@ use tokio::sync::Mutex;
 use axum::{
     extract::{Query, State}, response::IntoResponse
 };
-use colored::Colorize;
 use tower_sessions::Session;
-use http::StatusCode;
+use axum::http::StatusCode;
 use askama::Template;
+use tracing::{info, error};
 
 
-#[derive(Template)]
-#[template(path = "completed.html")]
+#[derive(Template, Debug)]
+#[template(path = "pages/completed.html")]
 struct CompletedPageTemplate {
     username: Option<String>,
     title: String,
@@ -28,18 +28,19 @@ struct CompletedPageTemplate {
     div_two_i32s_into_f32: fn(&&String, &&String) -> Result<f32>,
     timestamp_to_date: fn(&&String) -> String
 }
+#[tracing::instrument]
 pub async fn completed(
     State(app): State<Arc<Mutex<AppState>>>,
     Query(params): Query<HashMap<String, String>>,
     session: Session,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    eprintln!("{}", "[ Got request to build completed page...]".green());
+    info!("[ Got request to build completed page...]");
 
     // Unpack username and query parameters
     let username = session.get::<String>("username")
         .await
         .map_err(|e| {
-            eprintln!("{}", format!("Couldn't get username from session! Error: {e:?}").red());
+            error!(%e, "Couldn't get username from session!");
             (StatusCode::UNAUTHORIZED, "Couldn't get username from session!".to_string())
         })?;
     let user_query = params.get("user")
@@ -80,7 +81,7 @@ pub async fn completed(
                 Some(&timestamp_filter)
             )
             .map_err(|e| {
-                eprintln!("{}", format!("Couldn't get all jobs! Error: {e:?}").red());
+                error!(%e, "Couldn't get all jobs!");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get all jobs!".to_string())
             })?
     } else {

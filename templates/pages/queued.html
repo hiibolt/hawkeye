@@ -1,0 +1,68 @@
+{% extends "../layers/navbar_jobs.html" %}
+
+{% block navbar %}
+    <div class="nav-item">
+        <h2><code>jobstat</code></h2>
+    </div>
+    <div class="nav-item">
+        <p>This page is a wrapper around the <code>jobstat -anL</code> and <code>grep</code> commands, which returns a list of all queued jobs on Metis.</p>
+    </div>
+    {% match username %}
+        {% when None %}
+        <div class="nav-item">
+            <p>Job names are currently redacted, please <a href="login">log in</a> to view them.</p>
+        </div>
+        {% when Some with (_) %}
+    {% endmatch %}
+{% endblock %}
+
+{% block jobs %}
+    <div class="job-grid" id="running-jobs">
+    {% for job in jobs %}
+        <div class="job-card">
+            <div class="job-header">
+                <p>
+                    <b>{{ job["name"] }} - {{ job["pbs_id"] }} ({{ job["state"] }})</b>
+                    <br>
+                    Submitted by <a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a> on <b>{{ timestamp_to_date(job["start_time"]) }}</b>
+                </p>
+            </div>
+
+            <table class="job-table">
+                <thead>
+                    <tr>
+                        <th>Queue</th>
+                        <th>Walltime</th>
+                        <th># of CPUs</th>
+                        <th># of GPUs</th>
+                        <th>Memory</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>{{ job["queue"] }}</td>
+                        <td>{{ job["req_walltime"] }}</td>
+                        <td>{{ job["req_cpus"] }}</td>
+                        <td>
+                            {% match job.get("req_gpus") %}
+                                {% when Some with (gpus) %}
+                                    {{ gpus }}
+                                {% when None %}
+                            {% endmatch %}
+                        </td>
+                        <td>{{ job["req_mem"] }}GB</td>
+                    </tr>
+                </tbody>
+            </table>
+            <br>
+            {% match username %}
+                {% when Some with (_) %}
+                    <a href="stats?id={{ job["pbs_id"] }}">
+                        <button><b>View Detailed Stats</b></button>
+                    </a>
+                {% when None %}
+            {% endmatch %}
+        </div>
+    {% endfor %}
+    </div>
+{% endblock %}

@@ -18,8 +18,11 @@ pub async fn verify_login (
     session_command.arg(username);
     session_command.arg(password);
 
-    // Check the return status of the command
+    // Check the return status of the command, and
+    //  throw out both stdout and stderr
     let output = session_command
+        .stdout(openssh::Stdio::null())
+        .stderr(openssh::Stdio::null())
         .status().await
         .context("Failed to run verify_login command!")?;
 

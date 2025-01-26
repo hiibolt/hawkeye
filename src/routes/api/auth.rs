@@ -1,61 +1,29 @@
 use axum::{
-    extract::{Form, State}, http::StatusCode, response::{IntoResponse, Redirect}, Json
+    extract::{Form, State}, http::StatusCode, response::{IntoResponse, Redirect}
 };
-use futures::future::join_all;
-use serde::{Serialize, Deserialize};
+use serde::Deserialize;
 use tower_sessions::Session;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use colored::Colorize;
+use tokio::task::JoinSet;
+use tracing::{error, warn};
 
 use crate::{daemons::{groups::grab_group_thread, jobs::grab_old_jobs_thread}, routes::AppState};
 
-#[derive(Serialize)]
-struct UserInfo {
-    username: Option<String>,
-    groups: Option<Vec<String>>,
-}
-pub async fn me_handler(
-    State(app): State<Arc<Mutex<AppState>>>,
-    session: Session
-) -> Result<impl IntoResponse, (StatusCode, String)> {
-    eprintln!("{}", "[ Got a `me` request! ]".green());
-
-    // Attempt to retrieve the username from the session
-    if let Ok(Some(username)) = session.get::<String>("username").await {
-        eprintln!("{}", format!("User {username} is logged in!").green());
-        
-        // Get the groups
-        let groups = app.lock().await
-            .db
-            .get_user_groups(&username)
-            .map_err(|e| {
-                eprintln!("{}", format!("Couldn't get groups for user {username}! Error: {e:?}").red());
-                (StatusCode::INTERNAL_SERVER_ERROR,
-                    "Couldn't get groups!".to_string())
-            })?;
-
-        // If logged in, return it
-        Ok(Json(UserInfo {
-            username: Some(username),
-            groups: Some(groups),
-        }))
-    } else {
-        eprintln!("{}", "[ User is not logged in! ]".yellow());
-        Ok(Json(UserInfo { username: None, groups: None }))
-    }
-}
-
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct LoginRequest {
     username: String,
     password: String,
 }
-pub async fn login_handler(
+#[tracing::instrument]
+pub async fn login (
     State(app): State<Arc<Mutex<AppState>>>,
     session: Session,
     Form(payload): Form<LoginRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
+    // Clear the session
+    session.clear().await;
+
     // Attempt to verify (username, password) with your "verify_login"
     let (remote_username, remote_hostname) = {
         let state = app.lock().await;
@@ -74,18 +42,18 @@ pub async fn login_handler(
         )
         .await
         .map_err(|e| {
-            eprintln!("{}", format!("Couldn't verify login! Error: {e:?}").red());
+            error!(%e, "Couldn't verify login!");
             (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't verify login!".to_string())
         })?;
 
     if login_result.created_new {
         // Lookup groups and old jobs for the user
-        let handles = vec![
-            tokio::spawn(grab_group_thread(app.clone(), remote_username.clone(), remote_hostname.clone(), payload.username.clone())),
-            tokio::spawn(grab_old_jobs_thread(app.clone(), remote_username, remote_hostname, payload.username.clone()))
-        ];
+        let mut tasks = JoinSet::new();
         
-        join_all(handles).await;
+        tasks.spawn(grab_group_thread(app.clone(), remote_username.clone(), remote_hostname.clone(), payload.username.clone()));
+        tasks.spawn(grab_old_jobs_thread(app.clone(), remote_username, remote_hostname, payload.username.clone()));
+        
+        tasks.join_all().await;
     }
     
     match login_result.success {
@@ -97,7 +65,7 @@ pub async fn login_handler(
             // Now store that in the session
             session.insert("username", &payload.username).await
                 .map_err(|e| {
-                    eprintln!("{}", format!("Couldn't insert username into session! Error: {e:?}").red());
+                    error!(%e, "Couldn't insert username into session!");
                     (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't insert username into session!".to_string())
                 })?;
 
@@ -110,13 +78,13 @@ pub async fn login_handler(
 
             // If not verified or an error, you can respond with an error page/JSON
             // Here we'll just return a plain text error
-            eprintln!("{}", "[ Invalid login! ]".red());
+            warn!("[ Invalid login! ]");
             Ok(Redirect::to("/login?invalid=true"))
         }
     }
 }
 
-pub async fn logout_handler(
+pub async fn logout (
     session: Session,
 ) -> Result<(), (StatusCode, String)> {
     // Clear the entire session

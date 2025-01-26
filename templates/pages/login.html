@@ -1,0 +1,72 @@
+{% extends "../layers/base.html" %}
+
+{% block body %}
+    <style>
+        /* Centering the login container */
+        .login-container {
+            width: 300px; /* Set a fixed width */
+            margin: 100px auto; /* Center the box vertically and horizontally */
+            padding: 20px;
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Styling the form within the login container */
+        .login-form {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .login-form label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        .login-form input {
+            margin-bottom: 15px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .login-form button {
+            background-color: #A40000; /* NIU Red */
+            color: white;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s, transform 0.2s; /* Smooth transitions */
+        }
+        .login-form button:hover {
+            background-color: #900000; /* Darker shade of NIU Red on hover */
+            transform: translateY(-2px); /* Slight lift effect */
+        }
+
+        .login-alert {
+            color: red;
+        }
+    </style>
+
+    <div class="login-container">
+        <div class="branding">
+            <h2>CRCD Batchmon Login</h2>
+        </div>
+        <form action="api/v1/auth/login" method="POST" class="login-form">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" required>
+            
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+            
+            <button id="login-button" type="submit"><b>Login</b></button>
+        </form>
+        {% if failed %}
+            <p class="login-alert" id="alert-footer" style="text-align:center">
+                <i>Invalid Login! Please Try Again.</i>
+            </p>
+        {% endif %}
+    </div>
+{% endblock %}

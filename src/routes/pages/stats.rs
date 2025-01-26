@@ -1,20 +1,20 @@
-use super::{HtmlTemplate, AppState};
+use super::super::{HtmlTemplate, AppState};
 
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::{Context, Result};
 use tokio::sync::Mutex;
 use axum::{
-    extract::{Query, State}, response::IntoResponse
+    extract::{Query, State}, response::IntoResponse,
+    http::StatusCode
 };
-use colored::Colorize;
 use tower_sessions::Session;
-use http::StatusCode;
 use askama::Template;
+use tracing::{error, info, warn};
 
 
-#[derive(Template)]
-#[template(path = "stats.html")]
+#[derive(Template, Debug)]
+#[template(path = "pages/stats.html")]
 struct StatsPageTemplate {
     username: Option<String>,
     title: String,
@@ -30,19 +30,20 @@ struct StatsPageTemplate {
     timestamp_to_date: fn(&&String) -> String,
     to_i32: fn(&&String) -> Result<i32>
 }
+#[tracing::instrument]
 pub async fn stats(
     State(app): State<Arc<Mutex<AppState>>>,
     Query(params): Query<BTreeMap<String, String>>,
     session: Session,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    eprintln!("{}", "[ Got request to build running page...]".green());
+    info!("[ Got request to build the stats page...]");
 
     // Extract the username from the session 
     //  and the query parameters
     let username = session.get::<String>("username")
         .await
         .map_err(|e| {
-            eprintln!("{}", format!("Couldn't get username from session! Error: {e:?}").red());
+            error!(%e, "Couldn't get username from session!");
             (StatusCode::UNAUTHORIZED, "Couldn't get username from session!".to_string())
         })?;
     let id_query = params.get("id")
@@ -53,7 +54,7 @@ pub async fn stats(
         if let Some(ref id) = id_query {
             let id = id.parse::<i32>()
                 .map_err(|e| {
-                    eprintln!("{}", format!("Failed to parse ID! Error: {e:?}").red());
+                    error!(%e, "Failed to parse ID!");
                     (StatusCode::BAD_REQUEST, "Failed to parse ID!".to_string())
                 })?;
 
@@ -62,7 +63,7 @@ pub async fn stats(
                 .db
                 .get_job(id)
                 .map_err(|e| {
-                    eprintln!("{}", format!("Couldn't get job! Error: {e:?}").red());
+                    error!(%e, "Couldn't get job!");
                     (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get job!".to_string())
                 })?;
             let stats = app.lock()
@@ -70,13 +71,13 @@ pub async fn stats(
                 .db
                 .get_job_stats(id)
                 .map_err(|e| {
-                    eprintln!("{}", format!("Couldn't get job stats! Error: {e:?}").red());
+                    error!(%e, "Couldn't get job stats!");
                     (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get job stats!".to_string())
                 })?;
 
             Some((job, stats))
         } else {
-            eprintln!("{}", format!("No user query provided!").yellow());
+            warn!("No user query provided!");
             None
         }
     } else {

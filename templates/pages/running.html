@@ -1,11 +1,11 @@
-{% extends "navbar_jobs.html" %}
+{% extends "../layers/navbar_jobs.html" %}
 
 {% block navbar %}
     <div class="nav-item">
         <h2><code>jobstat</code></h2>
     </div>
     <div class="nav-item">
-        <p>This page is a wrapper around the <code>jobstat -anL</code> command, which returns a list of all running jobs on Metis.</p>
+        <p>This page is a wrapper around the <code>jobstat -anL</code> and <code>grep</code> commands, which returns a list of all running jobs on Metis.</p>
     </div>
     {% match username %}
         {% when None %}

@@ -7,15 +7,7 @@ mod routes;
 
 use db::lib::*;
 use daemons::{groups::groups_daemon, jobs::{jobs_daemon, old_jobs_daemon}};
-use routes::{
-    auth::{login_handler, logout_handler, me_handler},
-    completed::completed,
-    login::login, 
-    running::running, 
-    search::search, 
-    stats::stats,
-    AppState
-};
+use routes::AppState;
 
 use std::sync::Arc;
 
@@ -24,31 +16,23 @@ use tokio::sync::Mutex;
 use axum::{
     routing::{get, post}, Router
 };
-use colored::Colorize;
-use tower_sessions::{Expiry, MemoryStore, SessionManagerLayer};
+use tower_sessions::{cookie::Key, Expiry, MemoryStore, SessionManagerLayer};
 use time::Duration;
-use tower_http::{
-    services::ServeDir,
-    cors::CorsLayer
-};
-use http::{HeaderValue, Method};
+use tracing::info;
+use tracing_subscriber;
 
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Check if we're in development mode,
-    //  and set the frontend base URL accordingly
-    let frontend_base = if std::env::var("DEV_MODE")
-        .and_then(|v| Ok(v == "true"))
-        .unwrap_or(false)
-    {
-        eprintln!("{}", "[ Running in development mode! ]".yellow());
-        std::env::var("DEV_FRONTEND_BASEURL")
-            .context("Missing `DEV_FRONTEND_BASEURL` environment variable!")?
-    } else {
-        std::env::var("PROD_FRONTEND_BASEURL")
-            .context("Missing `PROD_FRONTEND_BASEURL` environment variable!")?
-    };
+    // Initialize the logger
+    tracing_subscriber::fmt()
+        .compact()
+        .with_file(true)
+        .with_line_number(true)
+        .with_thread_ids(true)
+        .with_target(false)
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
 
     // Create the shared state
     let state: Arc<Mutex<AppState>> = Arc::new(Mutex::new(AppState {
@@ -59,32 +43,30 @@ async fn main() -> Result<()> {
         db: DB::new(
             &std::env::var("DB_PATH")
                 .context("Missing `DB_PATH` environment variable!")?
-        ).context("Failed to establish connection to DB!")?,
-        frontend_base: frontend_base
+        ).context("Failed to establish connection to DB!")?
     }));
     
-    eprintln!("{}", "[ Starting daemons... ]".green());
+    info!("[ Starting daemons... ]");
     tokio::spawn(jobs_daemon(state.clone()));
     tokio::spawn(old_jobs_daemon(state.clone()));
     tokio::spawn(groups_daemon(state.clone()));
-    eprintln!("{}", "[ Daemons started! ]".green());
+    info!("[ Daemons started! ]");
 
     // Create the Session store and layer
     let session_store = MemoryStore::default();
     // E.g. sessions expire after 30 minutes of inactivity
     let session_layer = SessionManagerLayer::new(session_store)
-        .with_expiry(Expiry::OnInactivity(Duration::minutes(30)));
-    //.with_secure(
-    //    std::env::var("DEV_MODE")
-    //        .and_then(|v| Ok(v != "true"))
-    //        .unwrap_or(true) // true requires HTTPS; set appropriately
-    //) // true requires HTTPS; set appropriately
+        .with_expiry(Expiry::OnInactivity(Duration::minutes(30)))
+        .with_secure(true)
+        .with_private(
+            Key::try_generate()
+                .context("Couldn't generate a session key!")?
+        );
 
     // Build auth router
     let auth_routes = Router::new()
-        .route("/login", post(login_handler))
-        .route("/logout", post(logout_handler))
-        .route("/me", get(me_handler))
+        .route("/login", post(routes::api::auth::login))
+        .route("/logout", post(routes::api::auth::logout))
         .with_state(state.clone());
 
     // Build the V1 API router
@@ -92,32 +74,23 @@ async fn main() -> Result<()> {
         .nest("/auth", auth_routes)
         .with_state(state.clone());
 
-    // CORS layer that allows cross-site requests
-    let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-        .allow_origin(
-            state.lock().await.frontend_base
-                .parse::<HeaderValue>()
-                .context("Invalid frontend origin!")?)
-        .allow_credentials(true);
-
     // Nest the API into the general app router
     let app = Router::new()
         .nest("/api/v1", api_v1)
-        .route("/", get(running))
-        .route("/login", get(login))
-        .route("/stats", get(stats))
-        .route("/running", get(running))
-        .route("/completed", get(completed))
-        .route("/search", get(search))
-        .nest_service("/public", ServeDir::new("public"))
-        .layer(cors)
+        .route("/", get(routes::pages::running::running))
+        .route("/login", get(routes::pages::login::login))
+        .route("/stats", get(routes::pages::stats::stats))
+        .route("/running", get(routes::pages::running::running))
+        .route("/queued", get(routes::pages::queued::queued))
+        .route("/completed", get(routes::pages::completed::completed))
+        .route("/search", get(routes::pages::search::search))
+        .route("/public/images/favicon.ico", get(routes::get_favicon))
         .layer(session_layer)
         .with_state(state.clone());
 
     // Start the server
     let port = std::env::var("PORT").unwrap_or("5777".to_string());
-    eprintln!("{}", format!("[ Starting Hawkeye Backend on {port}... ]").green());
+    info!("[ Starting Hawkeye Backend on {port}... ]");
     let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{port}")).await
         .context("Couldn't start up listener!")?;
     axum::serve(listener, app).await

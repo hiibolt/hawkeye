@@ -1,36 +1,29 @@
-use super::HtmlTemplate;
+use super::super::HtmlTemplate;
 
 use std::collections::HashMap;
 
 use anyhow::Result;
 use axum::{
-    extract::Query, response::IntoResponse
+    extract::Query, response::IntoResponse,
+    http::StatusCode
 };
-use colored::Colorize;
 use tower_sessions::Session;
-use http::StatusCode;
 use askama::Template;
+use tracing::info;
 
-
-#[derive(Template)]
-#[template(path = "login.html")]
+#[derive(Template, Debug)]
+#[template(path = "pages/login.html")]
 struct LoginPageTemplate {
     title: String,
     username: Option<String>,
     failed: bool
 }
+#[tracing::instrument]
 pub async fn login(
     Query(params): Query<HashMap<String, String>>,
     session: Session,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    eprintln!("{}", "[ Got request to build login page...]".green());
-
-    // Destroy the session
-    session.delete().await
-        .map_err(|e| {
-            eprintln!("{}", format!("Couldn't clear session! Error: {e:?}").red());
-            (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't clear session!".to_string())
-        })?;
+    info!("[ Got request to build login page...]");
 
     let template = LoginPageTemplate {
         title: "Login - CRCD Batchmon".to_string(),
