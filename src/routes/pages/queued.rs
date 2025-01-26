@@ -20,8 +20,7 @@ struct QueuedPageTemplate {
     title: String,
     header: String,
     alert: Option<String>,
-    jobs: Vec<BTreeMap<String, String>>,
-    timestamp_to_date: fn(&&String) -> String
+    jobs: Vec<BTreeMap<String, String>>
 }
 #[tracing::instrument]
 pub async fn queued(
@@ -73,18 +72,6 @@ pub async fn queued(
             })?
     };
 
-    // Build helper functions
-    fn timestamp_to_date ( timestamp: &&String ) -> String {
-        let timestamp = timestamp.parse::<i64>().unwrap();
-        if let Some(date_time) = chrono::DateTime::from_timestamp(timestamp, 0) {
-            date_time.with_timezone(&chrono::Local)
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string()
-        } else {
-            String::from("Invalid timestamp!")
-        }
-    }
-
     // Build jobs and template
     let jobs = jobs.into_iter().rev().collect();
     let template = QueuedPageTemplate {
@@ -93,8 +80,6 @@ pub async fn queued(
         header: String::from("All Queued Jobs on Metis"),
         alert: None,
         jobs,
-
-        timestamp_to_date,
     };
 
     Ok(HtmlTemplate(template))
