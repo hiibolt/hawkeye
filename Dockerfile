@@ -21,9 +21,11 @@ COPY --from=builder /app/hawkeye.AppImage /app/hawkeye.AppImage
 COPY --from=builder /app/public /app/public
 
 # Run the binary
+WORKDIR /app
 VOLUME /data
 VOLUME /root/.ssh
-CMD ["/app/hawkeye.AppImage"]
+RUN ["/app/hawkeye.AppImage", "--appimage-extract"]
+CMD ["/app/squashfs-root/AppRun"]
 EXPOSE 5777
 
 # Reminder: Command to run this image with terminal is `docker run -it <image> /bin/bash`

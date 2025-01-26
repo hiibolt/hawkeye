@@ -1,0 +1,7 @@
+Dockerfile
+*.db
+.env
+.envrc
+/target
+/.direnv
+.dockerignore
