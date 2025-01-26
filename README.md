@@ -35,26 +35,28 @@ By default, this application exposes itself on post 5777 and on the host network
 
 ### Docker Compose
 Firstly, clone this respository and move into it:
-```
+```bash
 git clone https://github.com/hiibolt/hawkeye.git
 cd hawkeye
 ```
 
 Next, create a `.env` file, and add the following variables:
-- **Required Variables**
-- `REMOTE_USERNAME` - The SSH username you'd like to use
-- `REMOTE_HOSTNAME` - The hostname of the remote machine 
-- `DB_PATH` - The location of the DB you'd like to open from, relative to the `data` volume. You can leave this as `data.db`, if you don't know what to do. It will create a new database for you.
-- **Optional Variables**
-- `RUST_LOG` - The max level of logging to use. Some options are `info`, `warn`, and `error`.
+
+**Required Variables**
+- `REMOTE_USERNAME` - The SSH username you'd like to use to log into the remote machine
+- `REMOTE_HOSTNAME` - The SSH hostname of the remote machine 
+- `DB_PATH` - The path of the DB you'd like to open from, relative to the `data` volume. You can leave this as `data.db`, if you don't know what to do. It will create a new database for you.
+
+**Optional Variables**
+- `RUST_LOG` - The max level of logging to use. Some options are `info`, `warn`, and `error`. I suggest using `warn`, there is a staggering of output on the `info` level. If you wish to debug, use [selective levels](https://rust-lang-nursery.github.io/rust-cookbook/development_tools/debugging/config_log.html).
 - `GROUPS_DAEMON_PERIOD` - The time in seconds between each groups daemon run. The default is an hour.
 - `JOBS_DAEMON_PERIOD` - The time in seconds between each data gathering (`jobstat`). Default is every 5 minutes.
 - `OLD_JOBS_DAEMON_PERIOD` - The time in seconds between each data verification (`jmanl`). Default is every 30 minutes.
 
-Deploying is as simple as running `docker compose up -d`. Please note that it will may take substantial time to pull the image.
+Deploying is as simple as running `docker compose up -d`. Please note that it may take substantial time to pull the image for the first time.
 
 Next, you'll need to enter the container and generate an SSH keyfile:
-```
+```bash
 docker exec -it hawkeye-hawkeye-1 /bin/sh
 ssh-keygen
 ssh-copy-id <remote_username>@<remote_hostname>
@@ -62,6 +64,6 @@ exit
 ```
 
 Finally, restart the stack to include the new SSH login:
-```
+```bash
 docker compose restart
 ```
