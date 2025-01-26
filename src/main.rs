@@ -89,7 +89,7 @@ async fn main() -> Result<()> {
 
     // Start the server
     let port = std::env::var("PORT").unwrap_or("5777".to_string());
-    info!("[ Starting Hawkeye Backend on {port}... ]");
+    eprintln!("[ Starting Hawkeye on {port}... ]");
     let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{port}")).await
         .context("Couldn't start up listener!")?;
     axum::serve(listener, app).await

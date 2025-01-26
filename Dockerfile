@@ -13,12 +13,17 @@ RUN nix develop .#hawkeye
 
 # Import the work directory and build
 COPY . .
-RUN nix build .#hawkeye
+RUN nix bundle --bundler github:ralismark/nix-appimage .#hawkeye
+
+# Copy the AppImage and `public` dir to the final stage
+FROM scratch
+COPY --from=builder /app/hawkeye.AppImage /app/hawkeye.AppImage
+COPY --from=builder /app/public /app/public
 
 # Run the binary
 VOLUME /data
 VOLUME /root/.ssh
-CMD ["/app/result/bin/hawkeye"]
+CMD ["/app/hawkeye.AppImage"]
 EXPOSE 5777
 
 # Reminder: Command to run this image with terminal is `docker run -it <image> /bin/bash`

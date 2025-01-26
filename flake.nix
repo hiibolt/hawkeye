@@ -20,10 +20,13 @@
         };
 
         localRustBuild = rustPlatform.buildRustPackage rec {
-          pname = "app";
-          version = "0.0.1";
+          pname = "hawkeye";
+          version = "0.1.0";
           src = ./.;
           cargoBuildFlags = "";
+          meta = {
+            mainProgram = "hawkeye";
+          };
 
           cargoLock = {
             lockFile = ./Cargo.lock;
