@@ -231,7 +231,7 @@
             <br>
             {% match username %}
                 {% when Some with (_) %}
-                    <a href="stats.html?user={{ job["owner"] }}&id={{ job["pbs_id"] }}">
+                    <a href="stats?id={{ job["pbs_id"] }}">
                         <button><b>View Detailed Stats</b></button>
                     </a>
                 {% when None %}
