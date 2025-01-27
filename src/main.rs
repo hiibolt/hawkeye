@@ -60,7 +60,7 @@ async fn main() -> Result<()> {
         .with_private(
             Key::try_generate()
                 .context("Couldn't generate a session key!")?
-        );
+        ); 
 
     // Build auth router
     let auth_routes = Router::new()
