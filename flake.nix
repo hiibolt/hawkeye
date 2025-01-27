@@ -45,34 +45,7 @@
             openssh
             curl
             sqlite
-            sqlitebrowser
-            bash
           ]);
-          buildInputs = with pkgs; [
-            openssl
-            openssh
-            curl
-            sqlite
-            sqlitebrowser
-            bash
-          ];
-          /*
-          libPath = with pkgs; lib.makeLibraryPath [
-            udev
-            alsa-lib
-            vulkan-loader
-            libGL
-            libxkbcommon
-            gtk3-x11
-            gtk3
-            wayland
-            xorg.libX11
-            xorg.libXcursor
-            xorg.libXi
-            xorg.libXrandr
-            xorg.libxcb
-          ];
-          */
 
           # Certain Rust tools won't work without this
           # This can also be fixed by using oxalica/rust-overlay and specifying the rust-src extension
@@ -87,17 +60,30 @@
         packages = rec {
           ${name} = localRustBuild;
 
-          docker = 
-            let
-              bin = "${self.packages.${system}.${name}}/bin/${name}";
-            in
+          docker = let
+            bin = "${self.packages.${system}.${name}}/bin/${name}";
+          in
             pkgs.dockerTools.buildLayeredImage {
               inherit name;
               tag = "latest";
 
+              contents = with pkgs.dockerTools; [
+                usrBinEnv
+                binSh
+                caCertificates
+                fakeNss
+              ] ++ (with pkgs; [
+                openssl.dev
+                openssh
+                curl
+                sqlite
+                gnused
+                gnugrep
+                coreutils
+              ]);
+
               config = {
-                Cmd = [ bin ];
-                Network = "host";
+                Entrypoint = [ bin ];
                 Volumes = {
                   "/data" = { };
                   "/root/.ssh" = { };
