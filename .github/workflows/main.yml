@@ -33,11 +33,15 @@ jobs:
           # except the version with the `primary-key`, if it exists
           purge-primary-key: never
         
-      # Install and Login to Skopeo
-      - name: Install Skopeo
-        run: |
-          nix-env -i pkgs.skopeo
-          skopeo login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
+      # Install Skopeo
+      - name: 'Set up skopeo'
+        uses: warjiang/setup-skopeo@latest
+        with:
+          version: latest
+      
+      # Log in to the GitHub Container Registry
+      - name: Log in to the GitHub Container Registry
+        run: skopeo login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
 
       # Build the package defined in the Nix Flake 
       - name: Build the derviation defined in the Nix Flake
