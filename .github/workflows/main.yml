@@ -50,5 +50,4 @@ jobs:
       # Push the built image to the GitHub Container Registry
       - name: Push the built image to the GitHub Container Registry
         run: |
-          skopeo copy "docker-daemon:$(nix eval --raw .#docker)" "docker://ghcr.io/${{ github.repository }}/hawkeye:latest"
-          skopeo inspect "docker://ghcr.io/${{ github.repository }}/hawkeye:latest"
+          skopeo copy docker-archive:result docker://ghcr.io/${{ github.repository }}/hawkeye:latest
