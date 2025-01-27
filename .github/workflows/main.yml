@@ -50,4 +50,4 @@ jobs:
       # Push the built image to the GitHub Container Registry
       - name: Push the built image to the GitHub Container Registry
         run: |
-          skopeo copy docker-archive:result docker://ghcr.io/hiibolt/hawkeye:latest
+          skopeo --insecure-policy copy docker-archive:result docker://ghcr.io/hiibolt/hawkeye:latest
