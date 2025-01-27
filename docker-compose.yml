@@ -2,7 +2,6 @@ services:
   hawkeye:
     image: ghcr.io/hiibolt/hawkeye:latest
     network_mode: "host"
-    privileged: true
     ports:
       - "5777:5777"
     volumes:

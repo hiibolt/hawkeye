@@ -8,6 +8,9 @@
   outputs = { self, nixpkgs, rust-overlay, flake-utils }: 
     flake-utils.lib.eachDefaultSystem (system:
       let
+        name = "hawkeye";
+        version = "0.1.0";
+
         pkgs = import nixpkgs {
           inherit system;
           overlays = [ rust-overlay.overlays.default ];
@@ -20,12 +23,12 @@
         };
 
         localRustBuild = rustPlatform.buildRustPackage rec {
-          pname = "hawkeye";
-          version = "0.1.0";
+          pname = name;
+          inherit version;
           src = ./.;
           cargoBuildFlags = "";
           meta = {
-            mainProgram = "hawkeye";
+            mainProgram = name;
           };
 
           cargoLock = {
@@ -43,7 +46,16 @@
             curl
             sqlite
             sqlitebrowser
+            bash
           ]);
+          buildInputs = with pkgs; [
+            openssl
+            openssh
+            curl
+            sqlite
+            sqlitebrowser
+            bash
+          ];
           /*
           libPath = with pkgs; lib.makeLibraryPath [
             udev
@@ -72,10 +84,32 @@
         };
       in
       {
-        packages.hawkeye = localRustBuild;
+        packages = rec {
+          ${name} = localRustBuild;
+
+          docker = 
+            let
+              bin = "${self.packages.${system}.${name}}/bin/${name}";
+            in
+            pkgs.dockerTools.buildLayeredImage {
+              inherit name;
+              tag = "latest";
+
+              config = {
+                Cmd = [ bin ];
+                Network = "host";
+                Volumes = {
+                  "/data" = { };
+                  "/root/.ssh" = { };
+                };
+                ExposedPorts."5777/tcp" = { };
+              };
+            };
+        };
 
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [ cargo rustc ];
         };
+
     });
 }

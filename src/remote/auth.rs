@@ -1,6 +1,8 @@
-use anyhow::{Context, Result};
+use anyhow::{Result, anyhow};
 use openssh::{KnownHosts, Session};
+use tracing::error;
 
+#[tracing::instrument]
 pub async fn verify_login (
     remote_username: &str,
     remote_hostname: &str,
@@ -10,7 +12,10 @@ pub async fn verify_login (
     // Attempt to connect to METIS
     let session = Session::connect_mux(&format!("{remote_username}@{remote_hostname}"), KnownHosts::Strict)
         .await
-        .map_err(|e| anyhow::anyhow!("Error starting Metis connection! See below:\n{:#?}", e))?;
+        .map_err(|e| {
+            error!(%e, "Error starting Metis connection!");
+            anyhow!("Error starting Metis connection! See below:\n{:#?}", e)
+        })?;
 
     // Build our command
     let mut session_command = session
@@ -24,7 +29,10 @@ pub async fn verify_login (
         .stdout(openssh::Stdio::null())
         .stderr(openssh::Stdio::null())
         .status().await
-        .context("Failed to run verify_login command!")?;
+        .map_err(|e| {
+            error!(%e, "Failed to run verify_login command!");
+            anyhow!("Failed to run verify_login command! Error: {e:?}")
+        })?;
 
     match output.code() {
         Some(0) => Ok(true),
