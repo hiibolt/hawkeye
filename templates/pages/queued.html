@@ -17,52 +17,42 @@
 {% endblock %}
 
 {% block jobs %}
-    <div class="job-grid" id="running-jobs">
-    {% for job in jobs %}
-        <div class="job-card">
-            <div class="job-header">
-                <p>
-                    <b>{{ job["name"] }} - {{ job["pbs_id"] }} ({{ job["state"] }})</b>
-                    <br>
-                    Submitted by <a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a></b>
-                </p>
-            </div>
-
-            <table class="job-table">
-                <thead>
-                    <tr>
-                        <th>Queue</th>
-                        <th>Walltime</th>
-                        <th># of CPUs</th>
-                        <th># of GPUs</th>
-                        <th>Memory</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>{{ job["queue"] }}</td>
-                        <td>{{ job["req_walltime"] }}</td>
-                        <td>{{ job["req_cpus"] }}</td>
-                        <td>
-                            {% match job.get("req_gpus") %}
-                                {% when Some with (gpus) %}
-                                    {{ gpus }}
-                                {% when None %}
-                            {% endmatch %}
-                        </td>
-                        <td>{{ job["req_mem"] }}GB</td>
-                    </tr>
-                </tbody>
-            </table>
-            <br>
-            {% match username %}
-                {% when Some with (_) %}
+    <div class="completed-table-container">
+        <table class="job-table">
+        <tr>
+            <th>Job ID</th>
+            <th>Job Name</th>
+            <th>Job Owner</th>
+            <th>Queue</th>
+            <th>Walltime</th>
+            <th># of CPUs</th>
+            <th># of GPUs</th>
+            <th>Memory</th>
+            <th>More</th>
+        </tr>
+        {% for job in jobs %}
+            <tr>
+                <td><b>{{ job["pbs_id"] }}</b></td>
+                <td>{{ job["name"] }}</td>
+                <td><a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a></td>
+                <td>{{ job["queue"] }}</td>
+                <td>{{ job["req_walltime"] }}</td>
+                <td>{{ job["req_cpus"] }}</td>
+                <td>
+                    {% match job.get("req_gpus") %}
+                        {% when Some with (gpus) %}
+                            {{ gpus }}
+                        {% when None %}
+                    {% endmatch %}
+                </td>
+                <td>{{ job["req_mem"] }}GB</td>
+                <td>
                     <a href="stats?id={{ job["pbs_id"] }}">
-                        <button><b>View Detailed Stats</b></button>
+                        <button class="table-button">View Detailed Stats</button>
                     </a>
-                {% when None %}
-            {% endmatch %}
-        </div>
-    {% endfor %}
+                </td>
+            </tr>
+        {% endfor %}
+        </table>
     </div>
 {% endblock %}

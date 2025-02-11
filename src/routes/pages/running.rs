@@ -21,9 +21,10 @@ struct RunningPageTemplate {
     header: String,
     alert: Option<String>,
     jobs: Vec<BTreeMap<String, String>>,
-    parse_nodes: fn(&&String) -> String,
+
     timestamp_to_date: fn(&&String) -> String,
-    to_i32: fn(&&String) -> Result<i32>
+    to_i32: fn(&&String) -> Result<i32>,
+    shorten: fn(&&String) -> String
 }
 #[tracing::instrument]
 pub async fn running(
@@ -76,19 +77,6 @@ pub async fn running(
     };
 
     // Build helper functions
-    fn parse_nodes ( nodes_str: &&String ) -> String {
-        let nodes = nodes_str.split(',').collect::<Vec<&str>>();
-        let mut node_text = nodes
-            .iter()
-            .take(10)
-            .map(|e| *e)
-            .collect::<Vec<&str>>()
-            .join(", ");
-        if nodes.len() > 10 {
-            node_text += &format!("... ({} more)", nodes.len() - 10);
-        }
-        node_text
-    }
     fn timestamp_to_date ( timestamp: &&String ) -> String {
         let timestamp = timestamp.parse::<i64>().unwrap();
         if let Some(date_time) = chrono::DateTime::from_timestamp(timestamp, 0) {
@@ -104,6 +92,13 @@ pub async fn running(
             .context("Failed to parse number!")?
             as i32)
     }
+    fn shorten ( text: &&String ) -> String {
+        if text.len() > 20 {
+            format!("{}...", &text[..20])
+        } else {
+            text.to_string()
+        }
+    }
 
     // Build jobs and template
     let jobs = jobs.into_iter().rev().collect();
@@ -114,9 +109,9 @@ pub async fn running(
         alert: None,
         jobs,
 
-        parse_nodes,
         timestamp_to_date,
-        to_i32
+        to_i32,
+        shorten
     };
 
     Ok(HtmlTemplate(template))

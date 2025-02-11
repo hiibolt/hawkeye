@@ -26,7 +26,9 @@ struct CompletedPageTemplate {
     date_query: Option<String>,
 
     div_two_i32s_into_f32: fn(&&String, &&String) -> Result<f32>,
-    timestamp_to_date: fn(&&String) -> String
+    timestamp_to_date: fn(&&String) -> String,
+    to_percent_i32: fn(&f32) -> i32,
+    to_i32: fn(&&String) -> Result<i32>
 }
 #[tracing::instrument]
 pub async fn completed(
@@ -105,6 +107,14 @@ pub async fn completed(
             / num2.parse::<f32>()
                 .context("Failed to parse number 2!")?)
     }
+    fn to_percent_i32 ( num: &f32 ) -> i32 {
+        (num * 100.0) as i32
+    }
+    fn to_i32 ( num: &&String ) -> Result<i32> {
+        Ok(num.parse::<f64>()
+            .context("Failed to parse number!")?
+            as i32)
+    }
 
     // Insert the number of required nodes
     jobs = jobs.into_iter()
@@ -141,7 +151,9 @@ pub async fn completed(
         date_query,
 
         div_two_i32s_into_f32,
-        timestamp_to_date
+        timestamp_to_date,
+        to_percent_i32,
+        to_i32
     };
 
     Ok(HtmlTemplate(template))

@@ -84,14 +84,16 @@
                 <tr>
                     <th>Job ID</th>
                     <th># of CPUs</th>
-                    <th>Nodes</th>
-                    <th>Chunks</th> <!-- leave blank on table -->
-                    <th>Used Memory</th>
-                    <th>Used Memory/CPU</th>
-                    <th>Requested Memory</th>
-                    <th>Req/Used Memory</th>
-                    <th>Used Walltime</th>
+                    <th>Nodes/Chunks</th>
+                    <th>Requested Mem</th>
                     <th>End Date</th>
+                    <th>Used Mem/Core</th>
+                    <th>Used CPU</th>
+                    <th>Req/Used CPU</th>
+                    <th>Used Mem</th>
+                    <th>Req/Used Mem</th>
+                    <th>Used Walltime</th>
+                    <th>Req/Used Walltime</th>
                     <th>Exit Status</th>
                     <th>More</th>
                 </tr>
@@ -99,25 +101,72 @@
                     <tr>
                         <td><b>{{ job["pbs_id"] }}</b></td>
                         <td>{{ job["req_cpus"] }}</td>
-                        <td>{{ job["req_nodes"] }}</td>
-                        <td>{{ job["chunks"] }}</td>
-                        <td>{{ job["used_mem"] }}GB</td>
+                        <td>{{ job["req_nodes"] }}/{{ job["chunks"] }}</td>
+                        <td>{{ job["req_mem"] }}GB</td>
+                        <td>{{ timestamp_to_date(job["end_time"]) }}</td>
                         {% match div_two_i32s_into_f32(job["used_mem"], job["req_cpus"]) %}
                             {% when Ok with (used_mem_per_cpu) %}
-                                <td>{{ used_mem_per_cpu }}</td>
+                                {% match div_two_i32s_into_f32(job["req_mem"], job["req_cpus"]) %}
+                                    {% when Ok with (req_mem_per_cpu) %}
+                                        {% let eff = used_mem_per_cpu / req_mem_per_cpu %}
+                                        <td
+                                            style="background-color: rgba({{ 255-(255*to_percent_i32(eff))/100 }}, {{ (205*to_percent_i32(eff))/100 }}, 0, 0.5);"
+                                        >{{ used_mem_per_cpu }}</td>
+                                    {% when Err with (_) %}
+                                        <td>NaN</td>
+                                {% endmatch %}
                             {% when Err with (_) %}
                                 <td>NaN</td>
                         {% endmatch %}
-                        <td>{{ job["req_mem"] }}GB</td>
+                        {% match to_i32(job["cpu_efficiency"]) %}
+                            {% when Ok with (eff) %}
+                                <td
+                                    style="background-color: rgba({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0, 0.5);"
+                                >{{ job["used_cpu_percent"] }}%</td>
+                                <td
+                                    style="background-color: rgba({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0, 0.5);"
+                                >
+                                    {{ eff }}%
+                                </td>
+                            {% when Err with (_) %}
+                                <td style="background-color: rgba(255, 255, 0, 0.5);">{{ job["used_cpu_percent"] }}%</td>
+                                <td style="background-color: rgba(255, 255, 0, 0.5);">NaN</td>
+                        {% endmatch %}
                         {% match div_two_i32s_into_f32(job["used_mem"], job["req_mem"]) %}
                             {% when Ok with (used_mem_per_req) %}
-                                <td>{{ used_mem_per_req }}</td>
+                                <td
+                                    style="background-color: rgba({{ 255-(255*to_percent_i32(used_mem_per_req))/100 }}, {{ (205*to_percent_i32(used_mem_per_req))/100 }}, 0, 0.5);"
+                                >{{ job["used_mem"] }}GB</td>
+                                <td
+                                    style="background-color: rgba({{ 255-(255*to_percent_i32(used_mem_per_req))/100 }}, {{ (205*to_percent_i32(used_mem_per_req))/100 }}, 0, 0.5);"
+                                >{{ used_mem_per_req }}</td>
                             {% when Err with (_) %}
-                                <td>NaN</td>
+                                <td style="background-color: rgba(255, 255, 0, 0.5);">{{ job["used_mem"] }}GB</td>
+                                <td style="background-color: rgba(255, 255, 0, 0.5);">NaN</td>
                         {% endmatch %}
-                        <td>{{ job["used_walltime"] }}</td>
-                        <td>{{ timestamp_to_date(job["end_time"]) }}</td>
-                        <td>{{ job["exit_status"] }}</td>
+                        {% match to_i32(job["walltime_efficiency"]) %}
+                            {% when Ok with (eff) %}
+                                <td
+                                    style="background-color: rgba({{ (255*eff)/100 }}, {{ 205-(205*eff)/100 }}, 0, 0.5);"
+                                >{{ job["used_walltime"] }}</td>
+                                <td
+                                    style="background-color: rgba({{ (255*eff)/100 }}, {{ 205-(205*eff)/100 }}, 0, 0.5);"
+                                >
+                                    {{ eff }}%
+                                </td>
+                            {% when Err with (_) %}
+                                <td style="background-color: rgba(255, 255, 0, 0.5);">{{ job["used_walltime"] }}</td>
+                                <td style="background-color: rgba(255, 255, 0, 0.5);">NaN</td>
+                        {% endmatch %}
+                        <td 
+                            {% if job["exit_status"] == "0" %}
+                                style="background-color: rgba(0, 255, 0, 0.5);"
+                            {% else %}
+                                style="background-color: rgba(255, 255, 0, 0.5);"
+                            {% endif %}
+                        >
+                            {{ job["exit_status"] }}
+                        </td>
                         <td>
                             <a href="stats?id={{ job["pbs_id"] }}">
                                 <button class="table-button">View Detailed Stats</button>
