@@ -1,4 +1,5 @@
 use super::super::{HtmlTemplate, AppState};
+use super::sort_jobs;
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -128,6 +129,14 @@ pub async fn completed(
         })
         .rev()
         .collect();
+
+    // Sort the jobs by any sort and reverse queries
+    sort_jobs(
+        &mut jobs,
+        params.get("sort"),
+        params.get("reverse"),
+        username.is_some()
+    );
 
     // Build the header and template
     let header = if let Some(ref user_query) = user_query {

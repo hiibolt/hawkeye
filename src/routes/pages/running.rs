@@ -1,8 +1,11 @@
 use super::super::{HtmlTemplate, AppState};
+use super::sort_jobs;
 
+use std::collections::HashMap;
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::{Context, Result};
+use axum::extract::Query;
 use tokio::sync::Mutex;
 use axum::{
     extract::State, response::IntoResponse,
@@ -29,6 +32,7 @@ struct RunningPageTemplate {
 #[tracing::instrument]
 pub async fn running(
     State(app): State<Arc<Mutex<AppState>>>,
+    Query(params): Query<HashMap<String, String>>,
     session: Session,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
     info!("[ Got request to build running page...]");
@@ -42,7 +46,7 @@ pub async fn running(
         })?;
 
     // Get all running jobs
-    let jobs = if let Some(_) = username {
+    let mut jobs = if let Some(_) = username {
         app.lock()
             .await
             .db
@@ -99,6 +103,14 @@ pub async fn running(
             text.to_string()
         }
     }
+    
+    // Sort the jobs by any sort and reverse queries
+    sort_jobs(
+        &mut jobs,
+        params.get("sort"),
+        params.get("reverse"),
+        username.is_some()
+    );
 
     // Build jobs and template
     let jobs = jobs.into_iter().rev().collect();

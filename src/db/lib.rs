@@ -326,8 +326,10 @@ impl DB {
             additional_filters = format!(" WHERE {}", additional_filters);
         }
 
+        let final_query = format!("SELECT * FROM Jobs{}", additional_filters);
+
         //  ORDER BY start_time DESC
-        let mut stmt = self.conn.prepare(&format!("SELECT * FROM Jobs{}", additional_filters))?;
+        let mut stmt = self.conn.prepare(&final_query)?;
         let rows = stmt.query_map(params_from_iter(params), |row| {
             Ok(BTreeMap::from_iter(vec![
                 ("pbs_id".to_string(), row.get::<_, i32>(0)?.to_string()),
@@ -355,7 +357,10 @@ impl DB {
         });
 
         match rows {
-            Ok(rows) => Ok(rows.flatten().collect()),
+            Ok(rows) => {
+                let rows = rows.flatten().collect();
+                Ok(rows)
+            },
             Err(e) => {
                 error!(%e, "Failed to get rows!");
                 Err(anyhow!("Failed to get rows! Error: {e:?}"))
