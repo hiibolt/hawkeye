@@ -34,6 +34,7 @@ fn timestamp_field_to_date ( timestamp_field: &mut String ) {
 fn to_i32 ( num: &&String ) -> Result<i32> {
     Ok(num.parse::<f64>()
         .context("Failed to parse number!")?
+        .ceil()
         as i32)
 }
 fn div_two_i32s_into_f32 ( num1: &&String, num2: &&String ) -> Result<f32> {
