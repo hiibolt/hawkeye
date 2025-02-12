@@ -1,5 +1,5 @@
 use super::super::{HtmlTemplate, AppState};
-use super::{TableEntry, to_i32, timestamp_field_to_date, shorten_name_field, sort_jobs};
+use super::{TableEntry, to_i32, timestamp_field_to_date, shorten_name_field, sort_jobs, add_efficiency_tooltips, add_exit_status_tooltip};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -107,7 +107,7 @@ pub async fn search(
         username.is_some()
     );
 
-    // Tweak data to be presentable
+    // Tweak data to be presentable and add tooltips for efficiencies
     jobs = jobs.into_iter()
         .map(|mut job| {
             job.insert(
@@ -134,6 +134,12 @@ pub async fn search(
             if let Some(owner_str_ref) = job.get_mut("name") {
                 shorten_name_field(owner_str_ref);
             }
+
+            // Add tooltips for efficiencies
+            add_efficiency_tooltips(&mut job);
+
+            // Add tooltip for exit status
+            add_exit_status_tooltip(&mut job);
 
             job
         })

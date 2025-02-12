@@ -86,6 +86,7 @@
             <th>More</th>
         </tr>
         {% for job in jobs %}
+            <tr>
                 <td><b>{{ job["pbs_id"] }}</b></td>
                 {% block initial_entries %}{% endblock %}
                 {% for table_entry in table_entries %}
@@ -96,13 +97,18 @@
                                 {% if eff > 100|as_ref %}
                                     <td
                                         style="background-color: rgba(255, 255, 0, 0.5);"
+                                        class="popover__wrapper"
                                     >
                                 {% else %}
                                     <td
                                         style="background-color: rgba({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0, 0.5);"
+                                        class="popover__wrapper"
                                     >
+                                    <div class="popover__content">
+                                        {{ job[(table_entry.value.clone() + "_tooltip")|as_ref]|escape("none") }}
+                                    </div>
                                 {% endif %}
-                                    {{ eff }}%
+                                    {{ eff }}% ⓘ
                                 </td>
                             {% when Err with (_) %}
                                 <td style="background-color: rgba(255, 255, 0, 0.5);">{{ eff }}%</td>

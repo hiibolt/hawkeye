@@ -1,5 +1,5 @@
 use super::super::{HtmlTemplate, AppState};
-use super::{sort_jobs, timestamp_field_to_date, to_i32, TableEntry};
+use super::{sort_jobs, timestamp_field_to_date, to_i32, TableEntry, add_efficiency_tooltips, add_exit_status_tooltip};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -112,7 +112,7 @@ pub async fn completed(
         username.is_some()
     );
 
-    // Tweak data to be presentable
+    // Tweak data to be presentable and add tooltips for efficiencies
     jobs = jobs.into_iter()
         .map(|mut job| {
             job.insert(
@@ -136,6 +136,12 @@ pub async fn completed(
             if let Some(end_time_str_ref) = job.get_mut("end_time") {
                 timestamp_field_to_date(end_time_str_ref);
             }
+
+            // Add tooltips for efficiencies
+            add_efficiency_tooltips(&mut job);
+
+            // Add tooltip for exit status
+            add_exit_status_tooltip(&mut job);
 
             job
         })

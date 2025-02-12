@@ -22,6 +22,11 @@
             style="color: black;"
         >Job Owner</a>
     </th>
+    <th>
+        <a href="#" id="Job Owner"
+            style="color: black;"
+        >Job Owner</a>
+    </th>
     <script>
         document.getElementById("Job Owner").addEventListener("click", function(event) {
             event.preventDefault(); // Prevent default link behavior
@@ -53,7 +58,20 @@
     </script>
 {% endblock %}
 {% block initial_entries %}
-    <td><a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a></td>
+    <td class="popover__wrapper">
+        <a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a>
+        <div class="popover__content">
+            <p class="popover__message">Joseph Francis "Joey" Tribbiani, Jr.</p>
+            <p>:3</p>
+        </div>
+    </td>
+    <td class="popover__wrapper">
+        <a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a>
+        <div class="popover__content">
+            <p class="popover__message">Joseph Francis "Joey" Tribbiani, Jr.</p>
+            <p>:3</p>
+        </div>
+    </td>
 {% endblock %}
 {% block ending_headers %}
 {% endblock %}

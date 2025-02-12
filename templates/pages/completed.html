@@ -124,7 +124,11 @@
         {% else %}
             style="background-color: rgba(255, 255, 0, 0.5);"
         {% endif %}
+        class="popover__wrapper"
     >
-        {{ job["exit_status"] }}
+        <div class="popover__content">
+            {{ job["exit_status_tooltip"]|escape("none") }}
+        </div>
+        {{ job["exit_status"] }} ⓘ
     </td>
 {% endblock %}

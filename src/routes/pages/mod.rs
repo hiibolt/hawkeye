@@ -15,7 +15,7 @@ struct TableEntry {
     sort_by: String,
     value: String,
     value_unit: String,
-    colored: bool
+    colored: bool,
 }
 
 // Field helper functions
@@ -130,4 +130,74 @@ fn sort_jobs (
     if reverse_query {
         jobs.reverse();
     }
+}
+fn add_efficiency_tooltips ( job: &mut BTreeMap<String, String> ) {
+    job.insert(
+        String::from("cpu_efficiency_tooltip"),
+        format!(
+            "<b>CPU Efficiency: {:.2}%</b><br><br>", 
+            job.get("cpu_efficiency")
+                .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
+                .unwrap_or(0f32)
+        ) +
+        match job.get("cpu_efficiency")
+            .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
+            .unwrap_or(0f32)
+            .floor()
+        {
+            x if x < 50f32 => "Your job is not using the CPU efficiently! Consider using fewer CPUs.",
+            x if x < 75f32 => "Your job is using the CPU somewhat efficiently.",
+            x if x <= 100f32 => "Your job is using the CPU very efficiently!",
+            _ => "Your job is using too much CPU! Consider allocating more CPUs."
+        }
+    );
+    job.insert(
+        String::from("mem_efficiency_tooltip"),
+        format!(
+            "<b>Memory Efficiency: {:.2}%</b><br><br>", 
+            job.get("mem_efficiency")
+                .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
+                .unwrap_or(0f32)
+        ) +
+        match job.get("mem_efficiency")
+            .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
+            .unwrap_or(0f32)
+            .floor()
+        {
+            x if x < 50f32 => "Your job is not using the memory efficiently! Consider using less memory. If you are using a GPU, this is okay.",
+            x if x < 75f32 => "Your job is using the memory somewhat efficiently. If you are using a GPU, this is okay.",
+            x if x <= 100f32 => "Your job is using the memory very efficiently!",
+            _ => "Your job is using too much memory! Consider allocating more memory."
+        }
+    );
+    job.insert(
+        String::from("walltime_efficiency_tooltip"),
+        format!(
+            "<b>Walltime Efficiency: {:.2}%</b><br><br>",
+            job.get("walltime_efficiency")
+                .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
+                .unwrap_or(0f32)
+        ) +
+        match job.get("walltime_efficiency")
+            .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
+            .unwrap_or(0f32)
+            .floor()
+        {
+            x if x < 50f32 => "Your job is not using the walltime efficiently! Consider using less walltime.",
+            x if x < 75f32 => "Your job is using the walltime somewhat efficiently.",
+            x if x <= 100f32 => "Your job is using the walltime very efficiently!",
+            _ => "Your job is using too much walltime! Consider allocating more walltime."
+        }
+    );
+}
+fn add_exit_status_tooltip ( job: &mut BTreeMap<String, String> ) {
+    job.insert(
+        String::from("exit_status_tooltip"),
+        format!(
+            "<b>Exit Status: {}</b><br><br>", 
+            job.get("exit_status")
+                .and_then(|st| Some(st.parse::<i32>().unwrap_or(0)) )
+                .unwrap_or(0)
+        )
+    );
 }
