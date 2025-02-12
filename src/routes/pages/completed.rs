@@ -1,9 +1,9 @@
 use super::super::{HtmlTemplate, AppState};
-use super::sort_jobs;
+use super::{sort_jobs, timestamp_to_date, to_i32, TableEntry};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use tokio::sync::Mutex;
 use axum::{
     extract::{Query, State}, response::IntoResponse
@@ -14,6 +14,7 @@ use askama::Template;
 use tracing::{info, error};
 
 
+
 #[derive(Template, Debug)]
 #[template(path = "pages/completed.html")]
 struct CompletedPageTemplate {
@@ -22,13 +23,11 @@ struct CompletedPageTemplate {
     header: String,
     alert: Option<String>,
     jobs: Vec<BTreeMap<String, String>>,
+    table_entries: Vec<TableEntry>,
 
     user_query: Option<String>,
     date_query: Option<String>,
 
-    div_two_i32s_into_f32: fn(&&String, &&String) -> Result<f32>,
-    timestamp_to_date: fn(&&String) -> String,
-    to_percent_i32: fn(&f32) -> i32,
     to_i32: fn(&&String) -> Result<i32>
 }
 #[tracing::instrument]
@@ -91,32 +90,6 @@ pub async fn completed(
         vec!()
     };
 
-    // Build helper functions
-    fn timestamp_to_date ( timestamp: &&String ) -> String {
-        let timestamp = timestamp.parse::<i64>().unwrap();
-        if let Some(date_time) = chrono::DateTime::from_timestamp(timestamp, 0) {
-            date_time.with_timezone(&chrono::Local)
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string()
-        } else {
-            String::from("Invalid timestamp!")
-        }
-    }
-    fn div_two_i32s_into_f32 ( num1: &&String, num2: &&String ) -> Result<f32> {
-        Ok(num1.parse::<f32>()
-            .context("Failed to parse number 1!")?
-            / num2.parse::<f32>()
-                .context("Failed to parse number 2!")?)
-    }
-    fn to_percent_i32 ( num: &f32 ) -> i32 {
-        (num * 100.0) as i32
-    }
-    fn to_i32 ( num: &&String ) -> Result<i32> {
-        Ok(num.parse::<f64>()
-            .context("Failed to parse number!")?
-            as i32)
-    }
-
     // Insert the number of required nodes
     jobs = jobs.into_iter()
         .map(|mut job| {
@@ -138,6 +111,35 @@ pub async fn completed(
         username.is_some()
     );
 
+    // Tweak data to be presentable
+    jobs = jobs.into_iter()
+        .map(|mut job| {
+            job.insert(
+                String::from("used_mem_per_cpu"),
+                ( job.get("used_mem")
+                    .and_then(|st| st.parse::<f32>().ok())
+                    .unwrap_or(0f32) /
+                job.get("req_cpus")
+                    .and_then(|st| st.parse::<f32>().ok())
+                    .unwrap_or(1f32) )
+                    .to_string()
+            );
+            job.insert(
+                String::from("nodes/chunks"),
+                format!("{}/{}", 
+                    job.get("nodes").unwrap_or(&"".to_string())
+                        .split(',').collect::<Vec<&str>>().len(),
+                    job.get("chunks").unwrap_or(&"0".to_string())
+                )
+            );
+            if let Some(end_time_str_ref) = job.get_mut("end_time") {
+                *end_time_str_ref = timestamp_to_date(&&*end_time_str_ref);
+            }
+
+            job
+        })
+        .collect();
+
     // Build the header and template
     let header = if let Some(ref user_query) = user_query {
         format!(
@@ -155,13 +157,30 @@ pub async fn completed(
         title: String::from("Completed Jobs - CRCD Batchmon"),
         header,
         jobs,
+        table_entries: vec![
+            ("# of CPUs", "req_cpus", "req_cpus", "", false),
+            ("Nodes/Chunks", "chunks", "nodes/chunks", "", false),
+            ("Requested Mem", "req_mem", "req_mem", "GB", false),
+            ("End Date", "end_time", "end_time", "", false),
+            ("Used Mem/Core", "NOT_SORTABLE", "used_mem_per_cpu", "GB", false),
+            ("Used Mem", "used_mem", "used_mem", "GB", false),
+            ("Used Walltime", "used_walltime", "used_walltime", "", false),
+            ("Req/Used CPU", "NOT_SORTABLE", "cpu_efficiency", "", true),
+            ("Req/Used Mem", "NOT_SORTABLE", "mem_efficiency", "", true),
+            ("Req/Used Walltime", "NOT_SORTABLE", "walltime_efficiency", "", true)
+        ].into_iter()
+            .map(|(name, sort_by, value, value_units, colored)| TableEntry {
+                name: name.to_string(),
+                sort_by: sort_by.to_string(),
+                value: value.to_string(),
+                value_unit: value_units.to_string(),
+                colored
+            })
+            .collect(),
 
         user_query,
         date_query,
 
-        div_two_i32s_into_f32,
-        timestamp_to_date,
-        to_percent_i32,
         to_i32
     };
 

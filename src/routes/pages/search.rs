@@ -1,8 +1,9 @@
 use super::super::{HtmlTemplate, AppState};
+use super::{parse_nodes, timestamp_to_date, to_i32};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use tokio::sync::Mutex;
 use axum::{
     extract::{Query, State}, response::IntoResponse,
@@ -97,36 +98,6 @@ pub async fn search(
     } else {
         vec!()
     };
-
-    // Build helper functions
-    fn parse_nodes ( nodes_str: &&String ) -> String {
-        let nodes = nodes_str.split(',').collect::<Vec<&str>>();
-        let mut node_text = nodes
-            .iter()
-            .take(10)
-            .map(|e| *e)
-            .collect::<Vec<&str>>()
-            .join(", ");
-        if nodes.len() > 10 {
-            node_text += &format!("... ({} more)", nodes.len() - 10);
-        }
-        node_text
-    }
-    fn timestamp_to_date ( timestamp: &&String ) -> String {
-        let timestamp = timestamp.parse::<i64>().unwrap();
-        if let Some(date_time) = chrono::DateTime::from_timestamp(timestamp, 0) {
-            date_time.with_timezone(&chrono::Local)
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string()
-        } else {
-            String::from("Invalid timestamp!")
-        }
-    }
-    fn to_i32 ( num: &&String ) -> Result<i32> {
-        Ok(num.parse::<f64>()
-            .context("Failed to parse number!")?
-            as i32)
-    }
 
     // Build jobs and template
     let jobs = jobs.into_iter().rev().collect();

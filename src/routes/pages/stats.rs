@@ -1,8 +1,9 @@
 use super::super::{HtmlTemplate, AppState};
+use super::{div_two_i32s_into_f32, timestamp_to_date, to_i32};
 
 use std::{collections::BTreeMap, sync::Arc};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use tokio::sync::Mutex;
 use axum::{
     extract::{Query, State}, response::IntoResponse,
@@ -83,29 +84,6 @@ pub async fn stats(
     } else {
         None
     };
-
-    // Build helper functions
-    fn timestamp_to_date ( timestamp: &&String ) -> String {
-        let timestamp = timestamp.parse::<i64>().unwrap();
-        if let Some(date_time) = chrono::DateTime::from_timestamp(timestamp, 0) {
-            date_time.with_timezone(&chrono::Local)
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string()
-        } else {
-            String::from("Invalid timestamp!")
-        }
-    }
-    fn to_i32 ( num: &&String ) -> Result<i32> {
-        Ok(num.parse::<f64>()
-            .context("Failed to parse number!")?
-            as i32)
-    }
-    fn div_two_i32s_into_f32 ( num1: &&String, num2: &&String ) -> Result<f32> {
-        Ok(num1.parse::<f32>()
-            .context("Failed to parse number 1!")?
-            / num2.parse::<f32>()
-                .context("Failed to parse number 2!")?)
-    }
 
     // Build template
     let template = StatsPageTemplate {

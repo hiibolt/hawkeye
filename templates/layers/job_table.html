@@ -1,0 +1,86 @@
+{% extends "layers/navbar_jobs.html" %}
+
+{% block jobs %}
+    {% match username %}
+        {% when Some with (username) %}
+            <div class="completed-table-container">
+                <table class="job-table">
+                <tr>
+                    {% block initial_headers %}{% endblock %}
+                    {% for table_entry in table_entries %}
+                        <th>
+                            {% if table_entry.sort_by == "NOT_SORTABLE" %}
+                                {{ table_entry.name }}
+                            {% else %}
+                                <!-- Black text -->
+                                <a href="#" id="{{ table_entry.name }}"
+                                    style="color: black;"
+                                >{{ table_entry.name }}</a>
+                            {% endif %}
+                        </th>
+                        <script>
+                            document.getElementById("{{ table_entry.name }}").addEventListener("click", function(event) {
+                                event.preventDefault(); // Prevent default link behavior
+                    
+                                // The sort parameter you want to add
+                                const sortText = "{{ table_entry.sort_by}}"; // This could be dynamic, based on your specific sorting logic
+                    
+                                // Get the current URL
+                                const currentUrl = window.location.href;
+                    
+                                // Create a URL object to easily manipulate the query parameters
+                                const url = new URL(currentUrl);
+                    
+                                // Set the sort parameter
+                                url.searchParams.set("sort", sortText);
+                    
+                                // Toggle the 'reverse' parameter: if it's already true, remove it; otherwise, set it to true
+                                if (url.searchParams.has("reverse")) {
+                                    // If reverse is already set, toggle it off
+                                    url.searchParams.delete("reverse");
+                                } else {
+                                    // If reverse isn't set, add it
+                                    url.searchParams.set("reverse", "true");
+                                }
+                    
+                                // Redirect to the new URL with the updated query string
+                                window.location.href = url.toString();
+                            });
+                        </script>
+                    {% endfor %}
+                    {% block ending_headers %}{% endblock %}
+                </tr>
+                {% for job in jobs %}
+                    <tr>
+                        {% block initial_entries %}{% endblock %}
+                        {% for table_entry in table_entries %}
+                            {% if table_entry.colored == true %}
+                                {% let eff = job[table_entry.value|as_ref] %}
+                                {% match to_i32(eff) %}
+                                    {% when Ok with (eff) %}
+                                        {% if eff > 100|as_ref %}
+                                            <td
+                                                style="background-color: rgba(255, 255, 0, 0.5);"
+                                            >
+                                        {% else %}
+                                            <td
+                                                style="background-color: rgba({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0, 0.5);"
+                                            >
+                                        {% endif %}
+                                            {{ eff }}%
+                                        </td>
+                                    {% when Err with (_) %}
+                                        <td style="background-color: rgba(255, 255, 0, 0.5);">{{ eff }}%</td>
+                                {% endmatch %}
+                            {% else %}
+                                <td>{{ job[table_entry.value|as_ref] }}{{ table_entry.value_unit }}</td>
+                            {% endif %}
+                        {% endfor %}
+                        {% block ending_entries %}{% endblock %}
+                    </tr>
+                {% endfor %}
+                </table>
+            </div>
+        {% when None %}
+    {% endmatch %}
+{% endblock %}

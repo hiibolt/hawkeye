@@ -1,10 +1,10 @@
 use super::super::{HtmlTemplate, AppState};
-use super::sort_jobs;
+use super::{TableEntry, sort_jobs, timestamp_to_date, to_i32, shorten};
 
 use std::collections::HashMap;
 use std::{collections::BTreeMap, sync::Arc};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use axum::extract::Query;
 use tokio::sync::Mutex;
 use axum::{
@@ -15,7 +15,6 @@ use tower_sessions::Session;
 use askama::Template;
 use tracing::{info, error};
 
-
 #[derive(Template, Debug)]
 #[template(path = "pages/running.html")]
 struct RunningPageTemplate {
@@ -24,6 +23,7 @@ struct RunningPageTemplate {
     header: String,
     alert: Option<String>,
     jobs: Vec<BTreeMap<String, String>>,
+    table_entries: Vec<TableEntry>,
 
     timestamp_to_date: fn(&&String) -> String,
     to_i32: fn(&&String) -> Result<i32>,
@@ -79,30 +79,6 @@ pub async fn running(
                 (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get all jobs!".to_string())
             })?
     };
-
-    // Build helper functions
-    fn timestamp_to_date ( timestamp: &&String ) -> String {
-        let timestamp = timestamp.parse::<i64>().unwrap();
-        if let Some(date_time) = chrono::DateTime::from_timestamp(timestamp, 0) {
-            date_time.with_timezone(&chrono::Local)
-                .format("%Y-%m-%d %H:%M:%S")
-                .to_string()
-        } else {
-            String::from("Invalid timestamp!")
-        }
-    }
-    fn to_i32 ( num: &&String ) -> Result<i32> {
-        Ok(num.parse::<f64>()
-            .context("Failed to parse number!")?
-            as i32)
-    }
-    fn shorten ( text: &&String ) -> String {
-        if text.len() > 20 {
-            format!("{}...", &text[..20])
-        } else {
-            text.to_string()
-        }
-    }
     
     // Sort the jobs by any sort and reverse queries
     sort_jobs(
@@ -120,6 +96,28 @@ pub async fn running(
         header: String::from("All Running Jobs on Metis"),
         alert: None,
         jobs,
+        table_entries: vec![
+            ("Job ID", "pbs_id", "pbs_id", "", false),
+            ("Job Name", "job_name", "job_name", "", false),
+            ("Job Owner", "owner", "owner", "", false),
+            ("Job Start", "start_time", "start_time", "", false),
+            ("Queue", "queue", "queue", "", false),
+            ("Walltime", "req_walltime", "req_walltime", "", false),
+            ("# of CPUs", "req_cpus", "req_cpus", "", false),
+            ("# of GPUs", "req_gpus", "req_gpus", "", false),
+            ("Memory", "req_mem", "req_mem", "GB", false),
+            ("CPU Usage", "cpu_usage", "cpu_usage", "", true),
+            ("Memory Usage", "mem_usage", "mem_usage", "", true),
+            ("Walltime Usage", "walltime_usage", "walltime_usage", "", true)
+        ].into_iter()
+            .map(|(name, sort_by, value, value_units, colored)| TableEntry {
+                name: name.to_string(),
+                sort_by: sort_by.to_string(),
+                value: value.to_string(),
+                value_unit: value_units.to_string(),
+                colored
+            })
+            .collect(),
 
         timestamp_to_date,
         to_i32,

@@ -1,4 +1,4 @@
-{% extends "layers/navbar_jobs.html" %}
+{% extends "layers/job_table.html" %}
 
 {% block navbar %}
     <div class="nav-item">
@@ -76,106 +76,97 @@
     </script>
 {% endblock %}
 
-{% block jobs %}
-    {% match username %}
-        {% when Some with (username) %}
-            <div class="completed-table-container">
-                <table class="job-table">
-                <tr>
-                    <th>Job ID</th>
-                    <th># of CPUs</th>
-                    <th>Nodes/Chunks</th>
-                    <th>Requested Mem</th>
-                    <th>End Date</th>
-                    <th>Used Mem/Core</th>
-                    <th>Used CPU</th>
-                    <th>Req/Used CPU</th>
-                    <th>Used Mem</th>
-                    <th>Req/Used Mem</th>
-                    <th>Used Walltime</th>
-                    <th>Req/Used Walltime</th>
-                    <th>Exit Status</th>
-                    <th>More</th>
-                </tr>
-                {% for job in jobs %}
-                    <tr>
-                        <td><b>{{ job["pbs_id"] }}</b></td>
-                        <td>{{ job["req_cpus"] }}</td>
-                        <td>{{ job["req_nodes"] }}/{{ job["chunks"] }}</td>
-                        <td>{{ job["req_mem"] }}GB</td>
-                        <td>{{ timestamp_to_date(job["end_time"]) }}</td>
-                        {% match div_two_i32s_into_f32(job["used_mem"], job["req_cpus"]) %}
-                            {% when Ok with (used_mem_per_cpu) %}
-                                {% match div_two_i32s_into_f32(job["req_mem"], job["req_cpus"]) %}
-                                    {% when Ok with (req_mem_per_cpu) %}
-                                        {% let eff = used_mem_per_cpu / req_mem_per_cpu %}
-                                        <td
-                                            style="background-color: rgba({{ 255-(255*to_percent_i32(eff))/100 }}, {{ (205*to_percent_i32(eff))/100 }}, 0, 0.5);"
-                                        >{{ used_mem_per_cpu }}</td>
-                                    {% when Err with (_) %}
-                                        <td>NaN</td>
-                                {% endmatch %}
-                            {% when Err with (_) %}
-                                <td>NaN</td>
-                        {% endmatch %}
-                        {% match to_i32(job["cpu_efficiency"]) %}
-                            {% when Ok with (eff) %}
-                                <td
-                                    style="background-color: rgba({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0, 0.5);"
-                                >{{ job["used_cpu_percent"] }}%</td>
-                                <td
-                                    style="background-color: rgba({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0, 0.5);"
-                                >
-                                    {{ eff }}%
-                                </td>
-                            {% when Err with (_) %}
-                                <td style="background-color: rgba(255, 255, 0, 0.5);">{{ job["used_cpu_percent"] }}%</td>
-                                <td style="background-color: rgba(255, 255, 0, 0.5);">NaN</td>
-                        {% endmatch %}
-                        {% match div_two_i32s_into_f32(job["used_mem"], job["req_mem"]) %}
-                            {% when Ok with (used_mem_per_req) %}
-                                <td
-                                    style="background-color: rgba({{ 255-(255*to_percent_i32(used_mem_per_req))/100 }}, {{ (205*to_percent_i32(used_mem_per_req))/100 }}, 0, 0.5);"
-                                >{{ job["used_mem"] }}GB</td>
-                                <td
-                                    style="background-color: rgba({{ 255-(255*to_percent_i32(used_mem_per_req))/100 }}, {{ (205*to_percent_i32(used_mem_per_req))/100 }}, 0, 0.5);"
-                                >{{ used_mem_per_req }}</td>
-                            {% when Err with (_) %}
-                                <td style="background-color: rgba(255, 255, 0, 0.5);">{{ job["used_mem"] }}GB</td>
-                                <td style="background-color: rgba(255, 255, 0, 0.5);">NaN</td>
-                        {% endmatch %}
-                        {% match to_i32(job["walltime_efficiency"]) %}
-                            {% when Ok with (eff) %}
-                                <td
-                                    style="background-color: rgba({{ (255*eff)/100 }}, {{ 205-(205*eff)/100 }}, 0, 0.5);"
-                                >{{ job["used_walltime"] }}</td>
-                                <td
-                                    style="background-color: rgba({{ (255*eff)/100 }}, {{ 205-(205*eff)/100 }}, 0, 0.5);"
-                                >
-                                    {{ eff }}%
-                                </td>
-                            {% when Err with (_) %}
-                                <td style="background-color: rgba(255, 255, 0, 0.5);">{{ job["used_walltime"] }}</td>
-                                <td style="background-color: rgba(255, 255, 0, 0.5);">NaN</td>
-                        {% endmatch %}
-                        <td 
-                            {% if job["exit_status"] == "0" %}
-                                style="background-color: rgba(0, 255, 0, 0.5);"
-                            {% else %}
-                                style="background-color: rgba(255, 255, 0, 0.5);"
-                            {% endif %}
-                        >
-                            {{ job["exit_status"] }}
-                        </td>
-                        <td>
-                            <a href="stats?id={{ job["pbs_id"] }}">
-                                <button class="table-button">View Detailed Stats</button>
-                            </a>
-                        </td>
-                    </tr>
-                {% endfor %}
-                </table>
-            </div>
-        {% when None %}
-    {% endmatch %}
+{% block initial_headers %}
+    <th>
+        <a href="#" id="Job ID"
+            style="color: black;"
+        >Job ID</a>
+    </th>
+    <script>
+        document.getElementById("Job ID").addEventListener("click", function(event) {
+            event.preventDefault(); // Prevent default link behavior
+
+            // The sort parameter you want to add
+            const sortText = "pbs_id"; // This could be dynamic, based on your specific sorting logic
+
+            // Get the current URL
+            const currentUrl = window.location.href;
+
+            // Create a URL object to easily manipulate the query parameters
+            const url = new URL(currentUrl);
+
+            // Set the sort parameter
+            url.searchParams.set("sort", sortText);
+
+            // Toggle the 'reverse' parameter: if it's already true, remove it; otherwise, set it to true
+            if (url.searchParams.has("reverse")) {
+                // If reverse is already set, toggle it off
+                url.searchParams.delete("reverse");
+            } else {
+                // If reverse isn't set, add it
+                url.searchParams.set("reverse", "true");
+            }
+
+            // Redirect to the new URL with the updated query string
+            window.location.href = url.toString();
+        });
+    </script>
+{% endblock %}
+{% block ending_headers %}
+    <th>
+        <!-- Black text -->
+        <a href="#" id="Exit Status"
+            style="color: black;"
+        >Exit Status</a>
+    </th>
+    <script>
+        document.getElementById("Exit Status").addEventListener("click", function(event) {
+            event.preventDefault(); // Prevent default link behavior
+
+            // The sort parameter you want to add
+            const sortText = "exit_status"; // This could be dynamic, based on your specific sorting logic
+
+            // Get the current URL
+            const currentUrl = window.location.href;
+
+            // Create a URL object to easily manipulate the query parameters
+            const url = new URL(currentUrl);
+
+            // Set the sort parameter
+            url.searchParams.set("sort", sortText);
+
+            // Toggle the 'reverse' parameter: if it's already true, remove it; otherwise, set it to true
+            if (url.searchParams.has("reverse")) {
+                // If reverse is already set, toggle it off
+                url.searchParams.delete("reverse");
+            } else {
+                // If reverse isn't set, add it
+                url.searchParams.set("reverse", "true");
+            }
+
+            // Redirect to the new URL with the updated query string
+            window.location.href = url.toString();
+        });
+    </script>
+    <th>More</th>
+{% endblock %}
+
+{% block initial_entries %}
+    <td><b>{{ job["pbs_id"] }}</b></td>
+{% endblock %}
+{% block ending_entries %}
+    <td 
+        {% if job["exit_status"] == "0" %}
+            style="background-color: rgba(0, 255, 0, 0.5);"
+        {% else %}
+            style="background-color: rgba(255, 255, 0, 0.5);"
+        {% endif %}
+    >
+        {{ job["exit_status"] }}
+    </td>
+    <td>
+        <a href="stats?id={{ job["pbs_id"] }}">
+            <button class="table-button">View Detailed Stats</button>
+        </a>
+    </td>
 {% endblock %}
