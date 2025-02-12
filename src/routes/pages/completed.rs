@@ -173,6 +173,7 @@ pub async fn completed(
             ("Used Mem/Core", "NOT_SORTABLE", "used_mem_per_cpu", "GB", false),
             ("Used Mem", "used_mem", "used_mem", "GB", false),
             ("Used Walltime", "used_walltime", "used_walltime", "", false),
+            ("Used CPU Time", "used_cpu_time", "used_cpu_time", "", false),
             ("Req/Used CPU", "cpu_efficiency", "cpu_efficiency", "", true),
             ("Req/Used Mem", "mem_efficiency", "mem_efficiency", "", true),
             ("Req/Used Walltime", "walltime_efficiency", "walltime_efficiency", "", true)

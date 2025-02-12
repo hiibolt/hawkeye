@@ -1,5 +1,5 @@
 use super::super::{HtmlTemplate, AppState};
-use super::{TableEntry, to_i32, sort_jobs};
+use super::{TableEntry, to_i32, sort_jobs, shorten};
 use std::collections::HashMap;
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -26,7 +26,8 @@ struct QueuedPageTemplate {
     jobs: Vec<BTreeMap<String, String>>,
     table_entries: Vec<TableEntry>,
 
-    to_i32: fn(&&String) -> Result<i32>
+    to_i32: fn(&&String) -> Result<i32>,
+    shorten: fn(&&String) -> String
 }
 #[tracing::instrument]
 pub async fn queued(
@@ -97,8 +98,8 @@ pub async fn queued(
         alert: None,
         jobs,
         table_entries: vec![
-            ("Job Name", "name", "name", "", false),
             ("Queue", "queue", "queue", "", false),
+            ("Est. Start Time", "est_start_time", "est_start_time", "", false),
             ("Walltime", "req_walltime", "req_walltime", "", false),
             ("# of CPUs", "req_cpus", "req_cpus", "", false),
             ("# of GPUs", "req_gpus", "req_gpus", "", false),
@@ -113,7 +114,8 @@ pub async fn queued(
             })
             .collect(),
 
-        to_i32
+        to_i32,
+        shorten
     };
 
     Ok(HtmlTemplate(template))

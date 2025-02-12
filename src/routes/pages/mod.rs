@@ -19,13 +19,6 @@ struct TableEntry {
 }
 
 // Field helper functions
-fn shorten_name_field ( name_field: &mut String ) {
-    *name_field = if name_field.len() > 20 {
-        format!("{}...", &name_field[..20])
-    } else {
-        name_field.to_string()
-    };
-}
 fn timestamp_field_to_date ( timestamp_field: &mut String ) {
     let timestamp_i64 = timestamp_field.parse::<i64>().unwrap();
     *timestamp_field = if let Some(date_time) = chrono::DateTime::from_timestamp(timestamp_i64, 0) {
@@ -49,6 +42,13 @@ fn div_two_i32s_into_f32 ( num1: &&String, num2: &&String ) -> Result<f32> {
         / num2.parse::<f32>()
             .context("Failed to parse number 2!")?;
     Ok(result)
+}
+fn shorten ( name_field: &&String ) -> String {
+    if name_field.len() > 18 {
+        format!("{}...", &name_field[..18])
+    } else {
+        (*name_field).clone()
+    }
 }
 
 #[tracing::instrument]
@@ -96,7 +96,7 @@ fn sort_jobs (
         }
 
         // Second, if the sort query is 'req_walltime' or 'used_walltime', sort by HH:MM:SS
-        if sort_query == "req_walltime" || sort_query == "used_walltime" {
+        if sort_query == "req_walltime" || sort_query == "used_walltime" || sort_query == "used_cpu_time" {
             let a = a.split(':').collect::<Vec<&str>>();
             let b = b.split(':').collect::<Vec<&str>>();
 
@@ -132,72 +132,112 @@ fn sort_jobs (
     }
 }
 fn add_efficiency_tooltips ( job: &mut BTreeMap<String, String> ) {
+    let cpu_efficiency = job.get("cpu_efficiency")
+        .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
+        .unwrap_or(0f32);
+    let mem_efficiency = job.get("mem_efficiency")
+        .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
+        .unwrap_or(0f32);
+    let walltime_efficiency = job.get("walltime_efficiency")
+        .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
+        .unwrap_or(0f32);
+
     job.insert(
         String::from("cpu_efficiency_tooltip"),
-        format!(
-            "<b>CPU Efficiency: {:.2}%</b><br><br>", 
-            job.get("cpu_efficiency")
-                .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
-                .unwrap_or(0f32)
-        ) +
-        match job.get("cpu_efficiency")
-            .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
-            .unwrap_or(0f32)
-            .floor()
-        {
+        format!("<b>CPU Efficiency: {cpu_efficiency:.2}%</b>")
+        + "<br><br>"
+        + match cpu_efficiency {
             x if x < 50f32 => "Your job is not using the CPU efficiently! Consider using fewer CPUs.",
             x if x < 75f32 => "Your job is using the CPU somewhat efficiently.",
             x if x <= 100f32 => "Your job is using the CPU very efficiently!",
             _ => "Your job is using too much CPU! Consider allocating more CPUs."
-        }
+        } 
+        + "<br><br>"
+        + "See bottom of <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#Jobs%20optimization%20and%20control\">CRCD docs</a>"
     );
     job.insert(
         String::from("mem_efficiency_tooltip"),
-        format!(
-            "<b>Memory Efficiency: {:.2}%</b><br><br>", 
-            job.get("mem_efficiency")
-                .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
-                .unwrap_or(0f32)
-        ) +
-        match job.get("mem_efficiency")
-            .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
-            .unwrap_or(0f32)
-            .floor()
-        {
+        format!("<b>Memory Efficiency: {mem_efficiency:.2}%</b>")
+        + "<br><br>"
+        + match mem_efficiency {
             x if x < 50f32 => "Your job is not using the memory efficiently! Consider using less memory. If you are using a GPU, this is okay.",
             x if x < 75f32 => "Your job is using the memory somewhat efficiently. If you are using a GPU, this is okay.",
             x if x <= 100f32 => "Your job is using the memory very efficiently!",
             _ => "Your job is using too much memory! Consider allocating more memory."
         }
+        + "<br><br>"
+        + "See bottom of <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#Jobs%20optimization%20and%20control\">CRCD docs</a>"
     );
     job.insert(
         String::from("walltime_efficiency_tooltip"),
-        format!(
-            "<b>Walltime Efficiency: {:.2}%</b><br><br>",
-            job.get("walltime_efficiency")
-                .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
-                .unwrap_or(0f32)
-        ) +
-        match job.get("walltime_efficiency")
-            .and_then(|st| Some(st.parse::<f32>().unwrap_or(0f32)) )
-            .unwrap_or(0f32)
-            .floor()
-        {
+        format!("<b>Walltime Efficiency: {walltime_efficiency:.2}%</b>") 
+        + "<br><br>"
+        + match walltime_efficiency {
             x if x < 50f32 => "Your job is not using the walltime efficiently! Consider using less walltime.",
             x if x < 75f32 => "Your job is using the walltime somewhat efficiently.",
             x if x <= 100f32 => "Your job is using the walltime very efficiently!",
             _ => "Your job is using too much walltime! Consider allocating more walltime."
         }
+        + "<br><br>"
+        + "See bottom of <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#Jobs%20optimization%20and%20control\">CRCD docs</a>"
     );
 }
+fn signal_to_str_suffix ( 
+    signal: i32
+) -> &'static str {
+    match signal {
+        1 => " (SIGHUP)",
+        2 => " (SIGINT)",
+        3 => " (SIGQUIT)",
+        4 => " (SIGILL)",
+        5 => " (SIGTRAP)",
+        6 => " (SIGABRT)",
+        7 => " (SIGBUS)",
+        _ => ""
+    }
+}
 fn add_exit_status_tooltip ( job: &mut BTreeMap<String, String> ) {
+    let exit_status = job.get("exit_status")
+        .and_then(|st| Some(st.parse::<i32>().unwrap_or(0)) )
+        .unwrap_or(0);
+
     job.insert(
         String::from("exit_status_tooltip"),
-        format!(
-            "<b>Exit Status: {}</b><br><br>", 
-            job.get("exit_status")
-                .and_then(|st| Some(st.parse::<i32>().unwrap_or(0)) )
-                .unwrap_or(0)
-        )
+        format!("<b>Exit Status: {exit_status}</b><br><br>") + 
+        match exit_status {
+            0 => "The job executed successfully.",
+            -1 => "Job exec failed, before files, no retry",
+            -2 => "Job exec failed, after files, no retry",
+            -3 => "Job exec failed, do retry",
+            -4 => "Job aborted on MOM initialization",
+            -5 => "Job aborted on MOM initialization, checkpoint, no migrate",
+            -6 => "Job aborted on MOM initialization, checkpoint, ok migrate",
+            -7 => "Job restart failed",
+            -8 => "Initialization of Globus job failed. Do retry.",
+            -9 => "Initialization of Globus job failed. Do not retry.",
+            -10 => "Invalid UID/GID for job",
+            -11 => "Job was rerun",
+            -12 => "Job was checkpointed and killed",
+            -13 => "Job failed due to a bad password",
+            -14 => "Job was requeued (if rerunnable) or deleted (if not) due to a communication failure between Mother Superior and a Sister",
+            x if x < 128 && x > 0 => "The exit value of the top process in the job, typically the shell.",
+            x if x >= 128 => { 
+                "" // Computed in next if statement (to
+                   //  avoid referencing a dropped value)
+            },
+            _ => "Unknown exit status."
+        } + 
+        &if exit_status >= 128 { // Borrow here to treat as `&str`
+            let signal = exit_status % 128;
+            format!(
+                "The job's top process was killed with signal {}{}.",
+                signal,
+                signal_to_str_suffix(signal)
+            )
+        } else {
+            String::new()
+        } + 
+        "<br><br>" +
+        "<a href=\"https://www.nas.nasa.gov/hecc/support/kb/pbs-exit-codes_185.html\">More information on PBS exit codes</a>"
     );
 }

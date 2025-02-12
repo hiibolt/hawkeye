@@ -1,5 +1,5 @@
 use super::super::{HtmlTemplate, AppState};
-use super::{TableEntry, to_i32, timestamp_field_to_date, shorten_name_field, sort_jobs, add_efficiency_tooltips, add_exit_status_tooltip};
+use super::{TableEntry, to_i32, timestamp_field_to_date, shorten, sort_jobs, add_efficiency_tooltips, add_exit_status_tooltip};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -31,7 +31,8 @@ struct SearchPageTemplate {
     name_query: Option<String>,
     date_query: Option<String>,
 
-    to_i32: fn(&&String) -> Result<i32>
+    to_i32: fn(&&String) -> Result<i32>,
+    shorten: fn(&&String) -> String
 }
 #[tracing::instrument]
 pub async fn search(
@@ -131,10 +132,7 @@ pub async fn search(
             if let Some(end_time_str_ref) = job.get_mut("end_time") {
                 timestamp_field_to_date(end_time_str_ref);
             }
-            if let Some(owner_str_ref) = job.get_mut("name") {
-                shorten_name_field(owner_str_ref);
-            }
-
+            
             // Add tooltips for efficiencies
             add_efficiency_tooltips(&mut job);
 
@@ -163,7 +161,6 @@ pub async fn search(
         header: String::from("Search"),
         jobs,
         table_entries: vec![
-            ("Job Name", "name", "name", "", false),
             ("Queue", "queue", "queue", "", false),
             ("State", "state", "state", "", false),
             ("Walltime", "req_walltime", "req_walltime", "", false),
@@ -193,7 +190,8 @@ pub async fn search(
         name_query: params.get("name").and_then(|st| Some(st.to_owned())),
         date_query,
 
-        to_i32
+        to_i32,
+        shorten
     };
 
     Ok(HtmlTemplate(template))

@@ -1,5 +1,5 @@
 use super::super::{HtmlTemplate, AppState};
-use super::{TableEntry, timestamp_field_to_date, to_i32, shorten_name_field, sort_jobs, add_efficiency_tooltips};
+use super::{TableEntry, timestamp_field_to_date, to_i32, shorten, sort_jobs, add_efficiency_tooltips};
 
 use std::collections::HashMap;
 use std::{collections::BTreeMap, sync::Arc};
@@ -26,7 +26,8 @@ struct RunningPageTemplate {
     jobs: Vec<BTreeMap<String, String>>,
     table_entries: Vec<TableEntry>,
 
-    to_i32: fn(&&String) -> Result<i32>
+    to_i32: fn(&&String) -> Result<i32>,
+    shorten: fn(&&String) -> String
 }
 #[tracing::instrument]
 pub async fn running(
@@ -96,9 +97,6 @@ pub async fn running(
             if job.get("req_gpus").is_none() {
                 job.insert(String::from("req_gpus"), String::from("0"));
             }
-            if let Some(job_name_str_ref) = job.get_mut("name") {
-                shorten_name_field(job_name_str_ref);
-            }
 
             // Add tooltips for efficiencies
             add_efficiency_tooltips(&mut job);
@@ -117,7 +115,6 @@ pub async fn running(
         alert: None,
         jobs,
         table_entries: vec![
-            ("Job Name", "name", "name", "", false),
             ("Job Start", "start_time", "start_time", "", false),
             ("Queue", "queue", "queue", "", false),
             ("Walltime", "req_walltime", "req_walltime", "", false),
@@ -137,7 +134,8 @@ pub async fn running(
             })
             .collect(),
 
-        to_i32
+        to_i32,
+        shorten
     };
 
     Ok(HtmlTemplate(template))

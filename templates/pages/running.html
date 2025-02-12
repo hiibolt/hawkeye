@@ -22,11 +22,6 @@
             style="color: black;"
         >Job Owner</a>
     </th>
-    <th>
-        <a href="#" id="Job Owner"
-            style="color: black;"
-        >Job Owner</a>
-    </th>
     <script>
         document.getElementById("Job Owner").addEventListener("click", function(event) {
             event.preventDefault(); // Prevent default link behavior
@@ -56,22 +51,60 @@
             window.location.href = url.toString();
         });
     </script>
+    <th>
+        <a href="#" id="Job Name"
+            style="color: black;"
+        >Job Name</a>
+    </th>
+    <script>
+        document.getElementById("Job Name").addEventListener("click", function(event) {
+            event.preventDefault(); // Prevent default link behavior
+
+            // The sort parameter you want to add
+            const sortText = "name"; // This could be dynamic, based on your specific sorting logic
+
+            // Get the current URL
+            const currentUrl = window.location.href;
+
+            // Create a URL object to easily manipulate the query parameters
+            const url = new URL(currentUrl);
+
+            // Set the sort parameter
+            url.searchParams.set("sort", sortText);
+
+            // Toggle the 'reverse' parameter: if it's already true, remove it; otherwise, set it to true
+            if (url.searchParams.has("reverse")) {
+                // If reverse is already set, toggle it off
+                url.searchParams.delete("reverse");
+            } else {
+                // If reverse isn't set, add it
+                url.searchParams.set("reverse", "true");
+            }
+
+            // Redirect to the new URL with the updated query string
+            window.location.href = url.toString();
+        });
+    </script>
 {% endblock %}
 {% block initial_entries %}
-    <td class="popover__wrapper">
+    <td>
         <a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a>
-        <div class="popover__content">
-            <p class="popover__message">Joseph Francis "Joey" Tribbiani, Jr.</p>
-            <p>:3</p>
-        </div>
     </td>
-    <td class="popover__wrapper">
-        <a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a>
-        <div class="popover__content">
-            <p class="popover__message">Joseph Francis "Joey" Tribbiani, Jr.</p>
-            <p>:3</p>
-        </div>
-    </td>
+    {% if job["name"].len() > 18|as_ref %}
+        <td class="popover__wrapper">
+            <p>
+                {{ shorten(job["name"]) }}ⓘ
+            </p>
+            <div class="popover__content">
+                <p class="popover__message">
+                    <b>Full Job Name:</b><br>
+                    {{ job["name"] }}
+                </p>
+            </div>
+        </td>
+    {% else %}
+        <td>{{ job["name"] }}</td>
+    {% endif %}
 {% endblock %}
 {% block ending_headers %}
 {% endblock %}
