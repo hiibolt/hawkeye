@@ -98,7 +98,10 @@
                                     <td
                                         style="background-color: rgba(255, 255, 0, 0.5);"
                                         class="popover__wrapper"
-                                    >
+                                        >
+                                        <div class="popover__content">
+                                            {{ job[(table_entry.value.clone() + "_tooltip")|as_ref]|escape("none") }}
+                                        </div>
                                 {% else %}
                                     <td
                                         style="background-color: rgba({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0, 0.5);"
