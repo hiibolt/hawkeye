@@ -153,7 +153,7 @@ fn add_efficiency_tooltips ( job: &mut BTreeMap<String, String> ) {
             _ => "Your job is using too much CPU! Consider allocating more CPUs."
         } 
         + "<br><br>"
-        + "See bottom of <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#Jobs%20optimization%20and%20control\">CRCD docs</a>"
+        + "See the bottom of the <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#Jobs%20optimization%20and%20control\">CRCD docs</a> for more."
     );
     job.insert(
         String::from("mem_efficiency_tooltip"),
@@ -166,7 +166,7 @@ fn add_efficiency_tooltips ( job: &mut BTreeMap<String, String> ) {
             _ => "Your job is using too much memory! Consider allocating more memory."
         }
         + "<br><br>"
-        + "See bottom of <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#Jobs%20optimization%20and%20control\">CRCD docs</a>"
+        + "See the bottom of the <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#Jobs%20optimization%20and%20control\">CRCD docs</a> for more."
     );
     job.insert(
         String::from("walltime_efficiency_tooltip"),
@@ -179,7 +179,7 @@ fn add_efficiency_tooltips ( job: &mut BTreeMap<String, String> ) {
             _ => "Your job is using too much walltime! Consider allocating more walltime."
         }
         + "<br><br>"
-        + "See bottom of <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#Jobs%20optimization%20and%20control\">CRCD docs</a>"
+        + "See the bottom of the <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#Jobs%20optimization%20and%20control\">CRCD docs</a> for more."
     );
 }
 fn signal_to_str_suffix ( 
