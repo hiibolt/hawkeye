@@ -18,28 +18,30 @@ struct TableEntry {
     colored: bool
 }
 
-// Helper functions
-fn timestamp_to_date ( timestamp: &&String ) -> String {
-    let timestamp = timestamp.parse::<i64>().unwrap();
-    if let Some(date_time) = chrono::DateTime::from_timestamp(timestamp, 0) {
+// Field helper functions
+fn shorten_name_field ( name_field: &mut String ) {
+    *name_field = if name_field.len() > 20 {
+        format!("{}...", &name_field[..20])
+    } else {
+        name_field.to_string()
+    };
+}
+fn timestamp_field_to_date ( timestamp_field: &mut String ) {
+    let timestamp_i64 = timestamp_field.parse::<i64>().unwrap();
+    *timestamp_field = if let Some(date_time) = chrono::DateTime::from_timestamp(timestamp_i64, 0) {
         date_time.with_timezone(&chrono::Local)
             .format("%Y-%m-%d %H:%M:%S")
             .to_string()
     } else {
         String::from("Invalid timestamp!")
-    }
+    };
 }
+
+// Askama helper functions
 fn to_i32 ( num: &&String ) -> Result<i32> {
     Ok(num.parse::<f64>()
         .context("Failed to parse number!")?
         as i32)
-}
-fn shorten ( text: &&String ) -> String {
-    if text.len() > 20 {
-        format!("{}...", &text[..20])
-    } else {
-        text.to_string()
-    }
 }
 fn div_two_i32s_into_f32 ( num1: &&String, num2: &&String ) -> Result<f32> {
     let result = num1.parse::<f32>()
@@ -47,19 +49,6 @@ fn div_two_i32s_into_f32 ( num1: &&String, num2: &&String ) -> Result<f32> {
         / num2.parse::<f32>()
             .context("Failed to parse number 2!")?;
     Ok(result)
-}
-fn parse_nodes ( nodes_str: &&String ) -> String {
-    let nodes = nodes_str.split(',').collect::<Vec<&str>>();
-    let mut node_text = nodes
-        .iter()
-        .take(10)
-        .map(|e| *e)
-        .collect::<Vec<&str>>()
-        .join(", ");
-    if nodes.len() > 10 {
-        node_text += &format!("... ({} more)", nodes.len() - 10);
-    }
-    node_text
 }
 
 #[tracing::instrument]

@@ -1,5 +1,5 @@
 use super::super::{HtmlTemplate, AppState};
-use super::{sort_jobs, timestamp_to_date, to_i32, TableEntry};
+use super::{sort_jobs, timestamp_field_to_date, to_i32, TableEntry};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -19,6 +19,7 @@ use tracing::{info, error};
 #[template(path = "pages/completed.html")]
 struct CompletedPageTemplate {
     username: Option<String>,
+    needs_login: bool,
     title: String,
     header: String,
     alert: Option<String>,
@@ -133,7 +134,7 @@ pub async fn completed(
                 )
             );
             if let Some(end_time_str_ref) = job.get_mut("end_time") {
-                *end_time_str_ref = timestamp_to_date(&&*end_time_str_ref);
+                timestamp_field_to_date(end_time_str_ref);
             }
 
             job
@@ -154,6 +155,7 @@ pub async fn completed(
         // Cool compiler magic here :3c (avoids cloning)
         alert: if username.is_none() { Some("You are not logged in!".to_string()) } else { None },
         username,
+        needs_login: true,
         title: String::from("Completed Jobs - CRCD Batchmon"),
         header,
         jobs,
@@ -165,9 +167,9 @@ pub async fn completed(
             ("Used Mem/Core", "NOT_SORTABLE", "used_mem_per_cpu", "GB", false),
             ("Used Mem", "used_mem", "used_mem", "GB", false),
             ("Used Walltime", "used_walltime", "used_walltime", "", false),
-            ("Req/Used CPU", "NOT_SORTABLE", "cpu_efficiency", "", true),
-            ("Req/Used Mem", "NOT_SORTABLE", "mem_efficiency", "", true),
-            ("Req/Used Walltime", "NOT_SORTABLE", "walltime_efficiency", "", true)
+            ("Req/Used CPU", "cpu_efficiency", "cpu_efficiency", "", true),
+            ("Req/Used Mem", "mem_efficiency", "mem_efficiency", "", true),
+            ("Req/Used Walltime", "walltime_efficiency", "walltime_efficiency", "", true)
         ].into_iter()
             .map(|(name, sort_by, value, value_units, colored)| TableEntry {
                 name: name.to_string(),

@@ -1,5 +1,5 @@
 use super::super::{HtmlTemplate, AppState};
-use super::{parse_nodes, timestamp_to_date, to_i32};
+use super::{TableEntry, to_i32, timestamp_field_to_date, shorten_name_field, sort_jobs};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -18,10 +18,12 @@ use tracing::{info, error};
 #[template(path = "pages/search.html")]
 struct SearchPageTemplate {
     username: Option<String>,
+    needs_login: bool,
     title: String,
     header: String,
     alert: Option<String>,
     jobs: Vec<BTreeMap<String, String>>,
+    table_entries: Vec<TableEntry>,
 
     state_query: Option<String>,
     queue_query: Option<String>,
@@ -29,8 +31,6 @@ struct SearchPageTemplate {
     name_query: Option<String>,
     date_query: Option<String>,
 
-    parse_nodes: fn(&&String) -> String,
-    timestamp_to_date: fn(&&String) -> String,
     to_i32: fn(&&String) -> Result<i32>
 }
 #[tracing::instrument]
@@ -75,7 +75,7 @@ pub async fn search(
     };
 
     // Get all running jobs
-    let jobs = if let Some(_) = username {
+    let mut jobs = if let Some(_) = username {
         if any_filters {
             app.lock()
                 .await
@@ -99,8 +99,48 @@ pub async fn search(
         vec!()
     };
 
+    // Sort the jobs by any sort and reverse queries
+    sort_jobs(
+        &mut jobs,
+        params.get("sort"),
+        params.get("reverse"),
+        username.is_some()
+    );
+
+    // Tweak data to be presentable
+    jobs = jobs.into_iter()
+        .map(|mut job| {
+            job.insert(
+                String::from("used_mem_per_cpu"),
+                ( job.get("used_mem")
+                    .and_then(|st| st.parse::<f32>().ok())
+                    .unwrap_or(0f32) /
+                job.get("req_cpus")
+                    .and_then(|st| st.parse::<f32>().ok())
+                    .unwrap_or(1f32) )
+                    .to_string()
+            );
+            job.insert(
+                String::from("nodes/chunks"),
+                format!("{}/{}", 
+                    job.get("nodes").unwrap_or(&"".to_string())
+                        .split(',').collect::<Vec<&str>>().len(),
+                    job.get("chunks").unwrap_or(&"0".to_string())
+                )
+            );
+            if let Some(end_time_str_ref) = job.get_mut("end_time") {
+                timestamp_field_to_date(end_time_str_ref);
+            }
+            if let Some(owner_str_ref) = job.get_mut("name") {
+                shorten_name_field(owner_str_ref);
+            }
+
+            job
+        })
+        .rev()
+        .collect();
+
     // Build jobs and template
-    let jobs = jobs.into_iter().rev().collect();
     let template = SearchPageTemplate {
         alert: if username.is_none() { 
             Some("You are not logged in!".to_string())
@@ -112,9 +152,34 @@ pub async fn search(
             }
         },
         username,
+        needs_login: true,
         title: String::from("Search - CRCD Batchmon"),
         header: String::from("Search"),
         jobs,
+        table_entries: vec![
+            ("Job Name", "name", "name", "", false),
+            ("Queue", "queue", "queue", "", false),
+            ("State", "state", "state", "", false),
+            ("Walltime", "req_walltime", "req_walltime", "", false),
+            ("# of CPUs", "req_cpus", "req_cpus", "", false),
+            ("Nodes/Chunks", "chunks", "nodes/chunks", "", false),
+            ("Requested Mem", "req_mem", "req_mem", "GB", false),
+            ("End Date", "end_time", "end_time", "", false),
+            ("Used Mem/Core", "NOT_SORTABLE", "used_mem_per_cpu", "GB", false),
+            ("Used Mem", "used_mem", "used_mem", "GB", false),
+            ("Used Walltime", "used_walltime", "used_walltime", "", false),
+            ("Req/Used CPU", "cpu_efficiency", "cpu_efficiency", "", true),
+            ("Req/Used Mem", "mem_efficiency", "mem_efficiency", "", true),
+            ("Req/Used Walltime", "walltime_efficiency", "walltime_efficiency", "", true)
+        ].into_iter()
+            .map(|(name, sort_by, value, value_units, colored)| TableEntry {
+                name: name.to_string(),
+                sort_by: sort_by.to_string(),
+                value: value.to_string(),
+                value_unit: value_units.to_string(),
+                colored
+            })
+            .collect(),
 
         state_query: params.get("state").and_then(|st| Some(st.to_owned())),
         queue_query: params.get("queue").and_then(|st| Some(st.to_owned())),
@@ -122,8 +187,6 @@ pub async fn search(
         name_query: params.get("name").and_then(|st| Some(st.to_owned())),
         date_query,
 
-        parse_nodes,
-        timestamp_to_date,
         to_i32
     };
 

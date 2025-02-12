@@ -23,13 +23,12 @@
         {% when Some with (job_tuple) %}
         {% let job = job_tuple.0|as_ref %}
         {% let stats = job_tuple.1|as_ref %}
-
-        <div class="job-card">        
+      
             <div class="job-header">
                 <p>
                     <b>{{ job["name"] }} - {{ job["pbs_id"] }} ({% if job["state"] == "E" %}{{ job["state"] }} - Exit Status: '{{ job["exit_status"] }}'{% else %}{{ job["state"] }}{% endif %})</b>
                     <br>
-                    Submitted by <a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a>{% if job["start_time"] != "2147483647" %} on <b>{{ timestamp_to_date(job["start_time"]) }}</b>{% endif %}
+                    Submitted by <a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a>{% if job["start_time"] != "2147483647" %} on <b>{{ job["start_time"] }}</b>{% endif %}
                 </p>
             </div>
             <table class="job-table">
@@ -58,7 +57,7 @@
                         {% if job["end_time"] == "2147483647" %}
                             <td>Not Ended</td>
                         {% else %}
-                            <td>{{ timestamp_to_date(job["end_time"]) }}</td>
+                            <td>{{ job["end_time"] }}</td>
                         {% endif %}
                     </tr>
                 </tbody>
@@ -220,7 +219,6 @@
                     }
                 });
             </script>
-        </div>
         {% when None %}
         {% endmatch %}
     {% when None %}

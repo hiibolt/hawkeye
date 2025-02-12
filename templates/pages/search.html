@@ -1,4 +1,4 @@
-{% extends "../layers/navbar_jobs.html" %}
+{% extends "../layers/job_table.html" %}
 
 {% block navbar %}
     <div class="nav-item">
@@ -123,120 +123,90 @@
     {% endmatch %}
 {% endblock %}
 
-{% block jobs %}
-    <div class="job-grid" id="running-jobs">
-    {% for job in jobs %}
-        <div class="job-card">
-            <div class="job-header">
-                <p>
-                    <b>{{ job["name"] }} - {{ job["pbs_id"] }} ({{ job["state"] }})</b>
-                    <br>
-                    Submitted by <a href="index.html?user=${job.owner}">{{ job["owner"] }}</a> on <b>{{ timestamp_to_date(job["start_time"]) }}</b>
-                </p>
-            </div>
+{% block initial_headers %}
+    <th>
+        <a href="#" id="Job Owner"
+            style="color: black;"
+        >Job Owner</a>
+    </th>
+    <script>
+        document.getElementById("Job Owner").addEventListener("click", function(event) {
+            event.preventDefault(); // Prevent default link behavior
 
-            <table class="job-table">
-                <thead>
-                    <tr>
-                        <th>Queue</th>
-                        <th>Walltime</th>
-                        <th># of CPUs</th>
-                        <th># of GPUs</th>
-                        <th>Memory</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>{{ job["queue"] }}</td>
-                        <td>{{ job["req_walltime"] }}</td>
-                        <td>{{ job["req_cpus"] }}</td>
-                        <td>
-                            {% match job.get("req_gpus") %}
-                                {% when Some with (gpus) %}
-                                    {{ gpus }}
-                                {% when None %}
-                            {% endmatch %}
-                        </td>
-                        <td>{{ job["req_mem"] }}GB</td>
-                    </tr>
-                </tbody>
-            </table>
+            // The sort parameter you want to add
+            const sortText = "owner"; // This could be dynamic, based on your specific sorting logic
 
-            <div class="job-nodes">
-                <p>
-                    <b>Nodes</b>
-                    <br>
-                    {{ parse_nodes(job["nodes"]) }}
-                </p>
-            </div>
-            <div>
-                {% match to_i32(job["cpu_efficiency"]) %}
-                    {% when Ok with (eff) %}
-                        {% let width_eff = 5+eff %}
-                        {% if width_eff > 100 %}
-                            {% let width_eff = 100 %}
-                        {% endif %}
-                        <div class="progress-container">
-                            <div style="display:flex;justify-content:space-between;">
-                                <strong>CPU Efficiency (%)</strong>
-                                <strong style="text-align:right;margin-left:auto">🖥️</strong>
-                            </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: {{ width_eff }}%; background-color: rgb({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0);">
-                                    <b>{{ eff }}% </b>
-                                </div>
-                            </div>
-                        </div>
-                    {% when Err with (_) %}
-                {% endmatch %}
-                {% match to_i32(job["mem_efficiency"]) %}
-                    {% when Ok with (eff) %}
-                        {% let width_eff = 5+eff %}
-                        {% if width_eff > 100 %}
-                            {% let width_eff = 100 %}
-                        {% endif %}
-                        <div class="progress-container">
-                            <div style="display:flex;justify-content:space-between;">
-                                <strong>Memory Efficiency (%)</strong>
-                                <strong style="text-align:right;margin-left:auto">💾</strong>
-                            </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: {{ width_eff }}%; background-color: rgb({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0);">
-                                    <b>{{ eff }}% </b>
-                                </div>
-                            </div>
-                        </div>
-                    {% when Err with (_) %}
-                {% endmatch %}
-                {% match to_i32(job["walltime_efficiency"]) %}
-                    {% when Ok with (eff) %}
-                        {% let width_eff = 5+eff %}
-                        {% if width_eff > 100 %}
-                            {% let width_eff = 100 %}
-                        {% endif %}
-                        <div class="progress-container">
-                            <div style="display:flex;justify-content:space-between;">
-                                <strong>Walltime Usage (%)</strong>
-                                <strong style="text-align:right;margin-left:auto">🕒</strong>
-                            </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width: {{ width_eff }}%; background-color: rgb({{ (255*eff)/100 }}, {{ 205-(205*eff)/100 }}, 0);">
-                                    <b>{{ eff }}%</b>
-                                </div>
-                            </div>
-                        </div>
-                    {% when Err with (_) %}
-                {% endmatch %}
-            </div>
-            <br>
-            {% match username %}
-                {% when Some with (_) %}
-                    <a href="stats?id={{ job["pbs_id"] }}">
-                        <button><b>View Detailed Stats</b></button>
-                    </a>
-                {% when None %}
-            {% endmatch %}
-        </div>
-    {% endfor %}
-    </div>
+            // Get the current URL
+            const currentUrl = window.location.href;
+
+            // Create a URL object to easily manipulate the query parameters
+            const url = new URL(currentUrl);
+
+            // Set the sort parameter
+            url.searchParams.set("sort", sortText);
+
+            // Toggle the 'reverse' parameter: if it's already true, remove it; otherwise, set it to true
+            if (url.searchParams.has("reverse")) {
+                // If reverse is already set, toggle it off
+                url.searchParams.delete("reverse");
+            } else {
+                // If reverse isn't set, add it
+                url.searchParams.set("reverse", "true");
+            }
+
+            // Redirect to the new URL with the updated query string
+            window.location.href = url.toString();
+        });
+    </script>
+{% endblock %}
+{% block initial_entries %}
+    <td><a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a></td>
+{% endblock %}
+{% block ending_headers %}
+    <th>
+        <!-- Black text -->
+        <a href="#" id="Exit Status"
+            style="color: black;"
+        >Exit Status</a>
+    </th>
+    <script>
+        document.getElementById("Exit Status").addEventListener("click", function(event) {
+            event.preventDefault(); // Prevent default link behavior
+
+            // The sort parameter you want to add
+            const sortText = "exit_status"; // This could be dynamic, based on your specific sorting logic
+
+            // Get the current URL
+            const currentUrl = window.location.href;
+
+            // Create a URL object to easily manipulate the query parameters
+            const url = new URL(currentUrl);
+
+            // Set the sort parameter
+            url.searchParams.set("sort", sortText);
+
+            // Toggle the 'reverse' parameter: if it's already true, remove it; otherwise, set it to true
+            if (url.searchParams.has("reverse")) {
+                // If reverse is already set, toggle it off
+                url.searchParams.delete("reverse");
+            } else {
+                // If reverse isn't set, add it
+                url.searchParams.set("reverse", "true");
+            }
+
+            // Redirect to the new URL with the updated query string
+            window.location.href = url.toString();
+        });
+    </script>
+{% endblock %}
+{% block ending_entries %}
+    <td 
+        {% if job["exit_status"] == "0" %}
+            style="background-color: rgba(0, 255, 0, 0.5);"
+        {% else %}
+            style="background-color: rgba(255, 255, 0, 0.5);"
+        {% endif %}
+    >
+        {{ job["exit_status"] }}
+    </td>
 {% endblock %}

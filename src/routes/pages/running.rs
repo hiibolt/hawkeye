@@ -1,5 +1,5 @@
 use super::super::{HtmlTemplate, AppState};
-use super::{TableEntry, sort_jobs, timestamp_to_date, to_i32, shorten};
+use super::{TableEntry, sort_jobs, timestamp_field_to_date, to_i32, shorten_name_field};
 
 use std::collections::HashMap;
 use std::{collections::BTreeMap, sync::Arc};
@@ -19,15 +19,14 @@ use tracing::{info, error};
 #[template(path = "pages/running.html")]
 struct RunningPageTemplate {
     username: Option<String>,
+    needs_login: bool,
     title: String,
     header: String,
     alert: Option<String>,
     jobs: Vec<BTreeMap<String, String>>,
     table_entries: Vec<TableEntry>,
 
-    timestamp_to_date: fn(&&String) -> String,
-    to_i32: fn(&&String) -> Result<i32>,
-    shorten: fn(&&String) -> String
+    to_i32: fn(&&String) -> Result<i32>
 }
 #[tracing::instrument]
 pub async fn running(
@@ -88,27 +87,43 @@ pub async fn running(
         username.is_some()
     );
 
-    // Build jobs and template
-    let jobs = jobs.into_iter().rev().collect();
+    // Tweak data to be presentable
+    jobs = jobs.into_iter()
+        .map(|mut job| {
+            if let Some(start_time_str_ref) = job.get_mut("start_time") {
+                timestamp_field_to_date(start_time_str_ref);
+            }
+            if job.get("req_gpus").is_none() {
+                job.insert(String::from("req_gpus"), String::from("0"));
+            }
+            if let Some(job_name_str_ref) = job.get_mut("name") {
+                shorten_name_field(job_name_str_ref);
+            }
+
+            job
+        })
+        .rev()
+        .collect();
+
+    // Build template
     let template = RunningPageTemplate {
         username,
+        needs_login: false,
         title: String::from("Running Jobs - CRCD Batchmon"),
         header: String::from("All Running Jobs on Metis"),
         alert: None,
         jobs,
         table_entries: vec![
-            ("Job ID", "pbs_id", "pbs_id", "", false),
-            ("Job Name", "job_name", "job_name", "", false),
-            ("Job Owner", "owner", "owner", "", false),
+            ("Job Name", "name", "name", "", false),
             ("Job Start", "start_time", "start_time", "", false),
             ("Queue", "queue", "queue", "", false),
             ("Walltime", "req_walltime", "req_walltime", "", false),
             ("# of CPUs", "req_cpus", "req_cpus", "", false),
             ("# of GPUs", "req_gpus", "req_gpus", "", false),
             ("Memory", "req_mem", "req_mem", "GB", false),
-            ("CPU Usage", "cpu_usage", "cpu_usage", "", true),
-            ("Memory Usage", "mem_usage", "mem_usage", "", true),
-            ("Walltime Usage", "walltime_usage", "walltime_usage", "", true)
+            ("CPU Usage", "cpu_efficiency", "cpu_efficiency", "", true),
+            ("Memory Usage", "mem_efficiency", "mem_efficiency", "", true),
+            ("Walltime Usage", "walltime_efficiency", "walltime_efficiency", "", true)
         ].into_iter()
             .map(|(name, sort_by, value, value_units, colored)| TableEntry {
                 name: name.to_string(),
@@ -119,9 +134,7 @@ pub async fn running(
             })
             .collect(),
 
-        timestamp_to_date,
-        to_i32,
-        shorten
+        to_i32
     };
 
     Ok(HtmlTemplate(template))

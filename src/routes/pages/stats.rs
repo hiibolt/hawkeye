@@ -1,5 +1,5 @@
 use super::super::{HtmlTemplate, AppState};
-use super::{div_two_i32s_into_f32, timestamp_to_date, to_i32};
+use super::{div_two_i32s_into_f32, timestamp_field_to_date, to_i32};
 
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -26,9 +26,9 @@ struct StatsPageTemplate {
         BTreeMap<String, String>,
         Vec<BTreeMap<String, String>>
     )>,
+    jobs: Vec<BTreeMap<String, String>>,
     
     div_two_i32s_into_f32: fn(&&String, &&String) -> Result<f32>,
-    timestamp_to_date: fn(&&String) -> String,
     to_i32: fn(&&String) -> Result<i32>
 }
 #[tracing::instrument]
@@ -59,7 +59,7 @@ pub async fn stats(
                     (StatusCode::BAD_REQUEST, "Failed to parse ID!".to_string())
                 })?;
 
-            let job = app.lock()
+            let mut job = app.lock()
                 .await
                 .db
                 .get_job(id)
@@ -75,6 +75,13 @@ pub async fn stats(
                     error!(%e, "Couldn't get job stats!");
                     (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get job stats!".to_string())
                 })?;
+
+            if let Some(end_time_str_ref) = job.get_mut("start_time") {
+                timestamp_field_to_date(end_time_str_ref);
+            }
+            if let Some(end_time_str_ref) = job.get_mut("end_time") {
+                timestamp_field_to_date(end_time_str_ref);
+            }
 
             Some((job, stats))
         } else {
@@ -105,9 +112,9 @@ pub async fn stats(
         },
 
         job,
+        jobs: vec!(),
 
         div_two_i32s_into_f32,
-        timestamp_to_date,
         to_i32
     };
 

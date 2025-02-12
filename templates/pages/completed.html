@@ -77,40 +77,8 @@
 {% endblock %}
 
 {% block initial_headers %}
-    <th>
-        <a href="#" id="Job ID"
-            style="color: black;"
-        >Job ID</a>
-    </th>
-    <script>
-        document.getElementById("Job ID").addEventListener("click", function(event) {
-            event.preventDefault(); // Prevent default link behavior
-
-            // The sort parameter you want to add
-            const sortText = "pbs_id"; // This could be dynamic, based on your specific sorting logic
-
-            // Get the current URL
-            const currentUrl = window.location.href;
-
-            // Create a URL object to easily manipulate the query parameters
-            const url = new URL(currentUrl);
-
-            // Set the sort parameter
-            url.searchParams.set("sort", sortText);
-
-            // Toggle the 'reverse' parameter: if it's already true, remove it; otherwise, set it to true
-            if (url.searchParams.has("reverse")) {
-                // If reverse is already set, toggle it off
-                url.searchParams.delete("reverse");
-            } else {
-                // If reverse isn't set, add it
-                url.searchParams.set("reverse", "true");
-            }
-
-            // Redirect to the new URL with the updated query string
-            window.location.href = url.toString();
-        });
-    </script>
+{% endblock %}
+{% block initial_entries %}
 {% endblock %}
 {% block ending_headers %}
     <th>
@@ -148,11 +116,6 @@
             window.location.href = url.toString();
         });
     </script>
-    <th>More</th>
-{% endblock %}
-
-{% block initial_entries %}
-    <td><b>{{ job["pbs_id"] }}</b></td>
 {% endblock %}
 {% block ending_entries %}
     <td 
@@ -163,10 +126,5 @@
         {% endif %}
     >
         {{ job["exit_status"] }}
-    </td>
-    <td>
-        <a href="stats?id={{ job["pbs_id"] }}">
-            <button class="table-button">View Detailed Stats</button>
-        </a>
     </td>
 {% endblock %}

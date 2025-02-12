@@ -1,6 +1,5 @@
 use super::super::{HtmlTemplate, AppState};
-use super::sort_jobs;
-
+use super::{TableEntry, to_i32, sort_jobs};
 use std::collections::HashMap;
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -20,10 +19,14 @@ use tracing::{info, error};
 #[template(path = "pages/queued.html")]
 struct QueuedPageTemplate {
     username: Option<String>,
+    needs_login: bool,
     title: String,
     header: String,
     alert: Option<String>,
-    jobs: Vec<BTreeMap<String, String>>
+    jobs: Vec<BTreeMap<String, String>>,
+    table_entries: Vec<TableEntry>,
+
+    to_i32: fn(&&String) -> Result<i32>
 }
 #[tracing::instrument]
 pub async fn queued(
@@ -75,8 +78,6 @@ pub async fn queued(
                 (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get all jobs!".to_string())
             })?
     };
-
-    println!("{jobs:?}");
     
     // Sort the jobs by any sort and reverse queries
     sort_jobs(
@@ -90,10 +91,29 @@ pub async fn queued(
     let jobs = jobs.into_iter().rev().collect();
     let template = QueuedPageTemplate {
         username,
+        needs_login: false,
         title: String::from("Queued Jobs - CRCD Batchmon"),
         header: String::from("All Queued Jobs on Metis"),
         alert: None,
         jobs,
+        table_entries: vec![
+            ("Job Name", "name", "name", "", false),
+            ("Queue", "queue", "queue", "", false),
+            ("Walltime", "req_walltime", "req_walltime", "", false),
+            ("# of CPUs", "req_cpus", "req_cpus", "", false),
+            ("# of GPUs", "req_gpus", "req_gpus", "", false),
+            ("Memory", "req_mem", "req_mem", "GB", false)
+        ].into_iter()
+            .map(|(name, sort_by, value, value_units, colored)| TableEntry {
+                name: name.to_string(),
+                sort_by: sort_by.to_string(),
+                value: value.to_string(),
+                value_unit: value_units.to_string(),
+                colored
+            })
+            .collect(),
+
+        to_i32
     };
 
     Ok(HtmlTemplate(template))
