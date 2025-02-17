@@ -79,7 +79,6 @@ async fn main() -> ! {
         .route("/login", get(routes::pages::login::login))
         .route("/stats", get(routes::pages::stats::stats))
         .route("/running", get(routes::pages::running::running))
-        .route("/queued", get(routes::pages::queued::queued))
         .route("/completed", get(routes::pages::completed::completed))
         .route("/search", get(routes::pages::search::search))
         .route("/public/images/favicon.ico", get(routes::get_favicon))

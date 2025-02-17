@@ -45,6 +45,7 @@
             openssh
             curl
             sqlite
+            rust-analyzer
           ]);
 
           # Certain Rust tools won't work without this

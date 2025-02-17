@@ -7,7 +7,6 @@ pub mod login;
 pub mod completed;
 pub mod search;
 pub mod stats;
-pub mod queued;
 
 #[derive(Debug)]
 struct TableEntry {
