@@ -51,7 +51,7 @@ pub async fn running(
             .await
             .db
             .get_all_jobs(
-                Some(&"R".to_string()),
+                Some(vec!("R", "Q")),
                 None,
                 None,
                 None,
@@ -67,7 +67,7 @@ pub async fn running(
             .await
             .db
             .get_all_jobs(
-                Some(&"R".to_string()),
+                Some(vec!("R", "Q")),
                 None,
                 None,
                 None,
@@ -92,7 +92,11 @@ pub async fn running(
     jobs = jobs.into_iter()
         .map(|mut job| {
             if let Some(start_time_str_ref) = job.get_mut("start_time") {
-                timestamp_field_to_date(start_time_str_ref);
+                if start_time_str_ref == "2147483647" {
+                    *start_time_str_ref = String::from("Not Started");
+                } else {
+                    timestamp_field_to_date(start_time_str_ref);
+                }
             }
             if job.get("req_gpus").is_none() {
                 job.insert(String::from("req_gpus"), String::from("0"));
@@ -125,8 +129,9 @@ pub async fn running(
             (("Memory Usage", "<b>Memory Usage Efficiency</b><br><br>The total amount of memory in use divided by the amount of reserved memory, in %.<br><br>If low (indicated by the reddish background), consider a <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#jobcontrol\">workflow optimization</a>."), "mem_efficiency", "mem_efficiency", "", true),
             (("Elapsed Walltime", "<b>Total elapsed walltime/Reserved walltime, in %"), "walltime_efficiency", "walltime_efficiency", "", true)
         ].into_iter()
-            .map(|((name, _tooltip), sort_by, value, value_units, colored)| TableEntry {
+            .map(|((name, tooltip), sort_by, value, value_units, colored)| TableEntry {
                 name: name.to_string(),
+                tooltip: tooltip.to_string(),
                 sort_by: sort_by.to_string(),
                 value: value.to_string(),
                 value_unit: value_units.to_string(),

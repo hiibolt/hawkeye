@@ -6,10 +6,19 @@
     <div class="completed-table-container">
         <table class="job-table">
         <tr>
-            <th>
+            <!--
+                Do not remove. Not sure why, but removing this
+                 breaks the popover functionality.
+            -->
+        </tr>
+        <tr>
+            <th class="popover__wrapper">
                 <a href="#" id="Job ID"
                     style="color: black;"
                 >Job ID</a>
+                <div class="popover__content" style="font-weight:normal;">
+                    <b>PBS Job ID</b>
+                </div>
             </th>
             <script>
                 document.getElementById("Job ID").addEventListener("click", function(event) {
@@ -42,15 +51,19 @@
             </script>
             {% block initial_headers %}{% endblock %}
             {% for table_entry in table_entries %}
-                <th>
+                <th class="popover__wrapper">
                     {% if table_entry.sort_by == "NOT_SORTABLE" %}
                         {{ table_entry.name }}
                     {% else %}
                         <!-- Black text -->
                         <a href="#" id="{{ table_entry.name }}"
                             style="color: black;"
-                        >{{ table_entry.name }}</a>
+                        >{{ table_entry.name }}
+                        </a>
                     {% endif %}
+                    <div class="popover__content" style="font-weight:normal;">
+                        {{ table_entry.tooltip|as_ref|escape("none") }}
+                    </div>
                 </th>
                 <script>
                     document.getElementById("{{ table_entry.name }}").addEventListener("click", function(event) {

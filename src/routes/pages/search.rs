@@ -82,7 +82,8 @@ pub async fn search(
                 .await
                 .db
                 .get_all_jobs(
-                    params.get("state"),
+                    params.get("state")
+                        .and_then(|st| Some(vec!(st.as_str()))),
                     params.get("queue"),
                     params.get("user"),
                     params.get("name"),
@@ -177,6 +178,7 @@ pub async fn search(
         ].into_iter()
             .map(|(name, sort_by, value, value_units, colored)| TableEntry {
                 name: name.to_string(),
+                tooltip: String::from(""),
                 sort_by: sort_by.to_string(),
                 value: value.to_string(),
                 value_unit: value_units.to_string(),

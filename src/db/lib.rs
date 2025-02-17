@@ -282,7 +282,7 @@ impl DB {
     #[tracing::instrument]
     pub fn get_all_jobs (
         &mut self,
-        filter_state: Option<&String>,
+        filter_states: Option<Vec<&str>>,
         filter_queue: Option<&String>,
         filter_owner: Option<&String>,
         filter_name: Option<&String>,
@@ -291,9 +291,19 @@ impl DB {
     ) -> Result<Vec<BTreeMap<String, String>>> {
         let mut additional_filters= String::new();
         let mut params = vec![];
-        if let Some(filter_state) = filter_state {
-            additional_filters.push_str("state = ?1");
-            params.push(filter_state);
+        if let Some(filter_state) = filter_states {
+            if filter_state.len() == 0 {
+                additional_filters.push_str("state = ?1");
+                params.push(filter_state[0]);
+            } else {
+                additional_filters.push_str("state IN (");
+                for (i, state) in filter_state.iter().enumerate() {
+                    additional_filters.push_str(&format!("?{},", i + 1));
+                    params.push(state);
+                }
+                additional_filters.pop();
+                additional_filters.push(')');
+            }
         }
         if let Some(filter_queue) = filter_queue {
             if !additional_filters.is_empty() {

@@ -180,6 +180,7 @@ pub async fn completed(
         ].into_iter()
             .map(|(name, sort_by, value, value_units, colored)| TableEntry {
                 name: name.to_string(),
+                tooltip: String::from(""),
                 sort_by: sort_by.to_string(),
                 value: value.to_string(),
                 value_unit: value_units.to_string(),

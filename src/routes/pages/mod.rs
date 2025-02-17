@@ -11,6 +11,7 @@ pub mod stats;
 #[derive(Debug)]
 struct TableEntry {
     name: String,
+    tooltip: String,
     sort_by: String,
     value: String,
     value_unit: String,
