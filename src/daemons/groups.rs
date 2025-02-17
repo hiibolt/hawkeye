@@ -85,10 +85,9 @@ async fn grab_groups_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
 
     Ok(())
 }
-#[tracing::instrument]
 pub async fn groups_daemon (
     app: Arc<Mutex<AppState>>
-) {
+) -> ! {
     let groups_period = std::env::var("GROUPS_DAEMON_PERIOD")
         .unwrap_or(GROUPS_PERIOD.to_string())
         .parse::<u64>()

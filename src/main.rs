@@ -11,7 +11,6 @@ use routes::AppState;
 
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
 use tokio::sync::Mutex;
 use axum::{
     routing::{get, post}, Router
@@ -22,7 +21,7 @@ use tracing_subscriber;
 
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> ! {
     // Initialize the logger
     tracing_subscriber::fmt()
         .compact()
@@ -36,13 +35,13 @@ async fn main() -> Result<()> {
     // Create the shared state
     let state: Arc<Mutex<AppState>> = Arc::new(Mutex::new(AppState {
         remote_username: std::env::var("REMOTE_USERNAME")
-            .context("Missing `REMOTE_USERNAME` environment variable!")?,
+            .expect("Missing `REMOTE_USERNAME` environment variable!"),
         remote_hostname: std::env::var("REMOTE_HOSTNAME")
-            .context("Missing `REMOTE_HOSTNAME` environment variable!")?,
+            .expect("Missing `REMOTE_HOSTNAME` environment variable!"),
         db: DB::new(
             &std::env::var("DB_PATH")
-                .context("Missing `DB_PATH` environment variable!")?
-        ).context("Failed to establish connection to DB!")?
+                .expect("Missing `DB_PATH` environment variable!")
+        ).expect("Failed to establish connection to DB!")
     }));
     
     info!("[ Starting daemons... ]");
@@ -59,7 +58,7 @@ async fn main() -> Result<()> {
         .with_secure(true)
         .with_private(
             Key::try_generate()
-                .context("Couldn't generate a session key!")?
+                .expect("Couldn't generate a session key!")
         ); 
 
     // Build auth router
@@ -89,11 +88,12 @@ async fn main() -> Result<()> {
 
     // Start the server
     let port = std::env::var("PORT").unwrap_or("5777".to_string());
-    eprintln!("[ Starting Hawkeye on {port}... ]");
-    let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{port}")).await
-        .context("Couldn't start up listener!")?;
-    axum::serve(listener, app).await
-        .context("Could't serve the API!")?;
-
-    Ok(())
+    loop {
+        eprintln!("[ Starting Hawkeye on {port}... ]");
+        let listener = tokio::net::TcpListener::bind(&format!("0.0.0.0:{port}")).await
+            .expect("Couldn't start up listener!");
+        if let Err(e) = axum::serve(listener, app.clone()).await {
+            eprintln!("[ Error: {} ]", e);
+        }
+    }
 }

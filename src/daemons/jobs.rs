@@ -159,7 +159,7 @@ async fn grab_old_jobs_helper (
 }
 pub async fn old_jobs_daemon (
     app: Arc<Mutex<AppState>>
-) {
+) -> ! {
     let old_job_period = std::env::var("OLD_JOBS_DAEMON_PERIOD")
         .unwrap_or_else(|_| DEFAULT_OLD_JOB_PERIOD.to_string())
         .parse::<u64>()
@@ -242,8 +242,7 @@ async fn grab_jobs_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
 
     Ok(())
 }
-#[tracing::instrument]
-pub async fn jobs_daemon ( app: Arc<Mutex<AppState>> ) {
+pub async fn jobs_daemon ( app: Arc<Mutex<AppState>> ) -> ! {
     let jobstat_period = std::env::var("JOBS_DAEMON_PERIOD")
         .unwrap_or_else(|_| DEFAULT_JOBSTAT_PERIOD.to_string())
         .parse::<u64>()
