@@ -119,22 +119,22 @@
 {% endblock %}
 {% block initial_entries %}
     <td>
-        <a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a>
+        <a href="completed?user={{ get_field(job, "owner")? }}">{{ get_field(job, "owner")? }}</a>
     </td>
-    {% if job["name"].len() > 18|as_ref %}
+    {% if get_field(job, "name")?.len() > 18 %}
         <td class="popover__wrapper">
             <p>
-                {{ shorten(job["name"]) }}ⓘ
+                {{ shorten(get_field(job, "name")?|as_ref) }}ⓘ
             </p>
             <div class="popover__content">
                 <p class="popover__message">
                     <b>Full Job Name:</b><br>
-                    {{ job["name"] }}
+                    {{ get_field(job, "name")? }}
                 </p>
             </div>
         </td>
     {% else %}
-        <td>{{ job["name"] }}</td>
+        <td>{{ get_field(job, "name")? }}</td>
     {% endif %}
 {% endblock %}
 {% block ending_headers %}

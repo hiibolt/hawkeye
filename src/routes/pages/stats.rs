@@ -1,12 +1,13 @@
-use super::super::{HtmlTemplate, AppState};
-use super::{div_two_i32s_into_f32, timestamp_field_to_date, to_i32};
+use super::super::AppState;
+use super::{try_render_template, div_two_i32s_into_f32, timestamp_field_to_date, to_i32};
 
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::Result;
+use axum::response::Response;
 use tokio::sync::Mutex;
 use axum::{
-    extract::{Query, State}, response::IntoResponse,
+    extract::{Query, State},
     http::StatusCode
 };
 use tower_sessions::Session;
@@ -36,7 +37,7 @@ pub async fn stats(
     State(app): State<Arc<Mutex<AppState>>>,
     Query(params): Query<BTreeMap<String, String>>,
     session: Session,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<Response, (StatusCode, String)> {
     info!("[ Got request to build the stats page...]");
 
     // Extract the username from the session 
@@ -118,5 +119,5 @@ pub async fn stats(
         to_i32
     };
 
-    Ok(HtmlTemplate(template))
+    try_render_template(&template)
 }

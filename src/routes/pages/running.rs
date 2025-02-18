@@ -1,16 +1,17 @@
 use crate::routes::ClusterStatus;
 
-use super::super::{HtmlTemplate, AppState};
-use super::{TableEntry, TableStat, to_i32, shorten, sort_jobs};
+use super::super::AppState;
+use super::{try_render_template, TableEntry, TableStat, TableStatType, to_i32, shorten, get_field, sort_jobs};
 
 use std::collections::HashMap;
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::Result;
 use axum::extract::Query;
+use axum::response::Response;
 use tokio::sync::Mutex;
 use axum::{
-    extract::State, response::IntoResponse,
+    extract::State,
     http::StatusCode
 };
 use tower_sessions::Session;
@@ -31,14 +32,15 @@ struct RunningPageTemplate {
     cluster_status: Option<ClusterStatus>,
 
     to_i32: fn(&&String) -> Result<i32>,
-    shorten: fn(&&String) -> String
+    shorten: fn(&&String) -> String,
+    get_field: fn(&BTreeMap<String, String>, &str) -> Result<String>
 }
 #[tracing::instrument]
 pub async fn running(
     State(app): State<Arc<Mutex<AppState>>>,
     Query(params): Query<HashMap<String, String>>,
     session: Session,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<Response, (StatusCode, String)> {
     info!("[ Got request to build running page...]");
 
     // Extract the username from the session
@@ -147,8 +149,9 @@ pub async fn running(
         cluster_status: app.lock().await.status,
 
         to_i32,
-        shorten
+        shorten,
+        get_field
     };
 
-    Ok(HtmlTemplate(template))
+    try_render_template(&template)
 }

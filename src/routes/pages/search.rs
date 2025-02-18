@@ -1,12 +1,13 @@
-use super::super::{HtmlTemplate, AppState};
-use super::{TableEntry, TableStat, to_i32, timestamp_field_to_date, shorten, sort_jobs, add_efficiency_tooltips, add_exit_status_tooltip};
+use super::super::AppState;
+use super::{try_render_template, TableEntry, TableStat, TableStatType, to_i32, get_field, timestamp_field_to_date, shorten, sort_jobs, add_efficiency_tooltips, add_exit_status_tooltip};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
 use anyhow::Result;
+use axum::response::Response;
 use tokio::sync::Mutex;
 use axum::{
-    extract::{Query, State}, response::IntoResponse,
+    extract::{Query, State},
     http::StatusCode
 };
 use tower_sessions::Session;
@@ -32,14 +33,15 @@ struct SearchPageTemplate {
     date_query: Option<String>,
 
     to_i32: fn(&&String) -> Result<i32>,
-    shorten: fn(&&String) -> String
+    shorten: fn(&&String) -> String,
+    get_field: fn(&BTreeMap<String, String>, &str) -> Result<String>
 }
 #[tracing::instrument]
 pub async fn search(
     State(app): State<Arc<Mutex<AppState>>>,
     Query(params): Query<HashMap<String, String>>,
     session: Session,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<Response, (StatusCode, String)> {
     info!("[ Got request to build the search page...]");
 
     // Extract the session username and query parameters
@@ -183,8 +185,9 @@ pub async fn search(
         date_query,
 
         to_i32,
-        shorten
+        shorten,
+        get_field
     };
 
-    Ok(HtmlTemplate(template))
+    try_render_template(&template)
 }

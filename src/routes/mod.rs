@@ -1,9 +1,5 @@
 use axum::response::IntoResponse;
-use askama::Template;
-use axum::{
-    response::{Html, Response},
-    http::StatusCode
-};
+use axum::http::StatusCode;
 
 use anyhow::Result;
 use tokio::io::AsyncReadExt;
@@ -31,7 +27,7 @@ pub struct AppState {
 
     pub status: Option<ClusterStatus>
 }
-
+/*
 struct HtmlTemplate<T>(T);
 impl<T> IntoResponse for HtmlTemplate<T>
     where
@@ -48,7 +44,7 @@ impl<T> IntoResponse for HtmlTemplate<T>
                 .into_response(),
         }
     }
-}
+} */
 
 pub async fn get_favicon ( ) -> Result<impl IntoResponse, (StatusCode, String)> {
     let mut file = match tokio::fs::File::open("public/images/favicon.ico").await {

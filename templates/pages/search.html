@@ -194,21 +194,21 @@
     </script>
 {% endblock %}
 {% block initial_entries %}
-    <td><a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a></td>
-    {% if job["name"].len() > 18|as_ref %}
+    <td><a href="completed?user={{ get_field(job, "owner")? }}">{{ get_field(job, "owner")? }}</a></td>
+    {% if get_field(job, "name")?.len() > 18 %}
         <td class="popover__wrapper">
             <p>
-                {{ shorten(job["name"]) }}ⓘ
+                {{ shorten(get_field(job, "name")?|as_ref) }}ⓘ
             </p>
             <div class="popover__content">
                 <p class="popover__message">
                     <b>Full Job Name:</b><br>
-                    {{ job["name"] }}
+                    {{ get_field(job, "name")? }}
                 </p>
             </div>
         </td>
     {% else %}
-        <td>{{ job["name"] }}</td>
+        <td>{{ get_field(job, "name")? }}</td>
     {% endif %}
 {% endblock %}
 {% block ending_headers %}
@@ -250,12 +250,12 @@
 {% endblock %}
 {% block ending_entries %}
     <td 
-        {% if job["exit_status"] == "0" %}
+        {% if get_field(job, "exit_status")? == "0" %}
             style="background-color: rgba(0, 255, 0, 0.5);"
         {% else %}
             style="background-color: rgba(255, 255, 0, 0.5);"
         {% endif %}
     >
-        {{ job["exit_status"] }}
+        {{ get_field(job, "exit_status")? }}
     </td>
 {% endblock %}

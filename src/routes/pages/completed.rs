@@ -1,12 +1,12 @@
-use super::super::{HtmlTemplate, AppState};
-use super::{sort_jobs, to_i32, TableEntry, TableStat, add_exit_status_tooltip};
+use super::super::AppState;
+use super::{try_render_template, sort_jobs, to_i32, get_field, TableEntry, TableStat, TableStatType, add_exit_status_tooltip};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
 use anyhow::Result;
 use tokio::sync::Mutex;
 use axum::{
-    extract::{Query, State}, response::IntoResponse
+    extract::{Query, State}, response::Response
 };
 use tower_sessions::Session;
 use axum::http::StatusCode;
@@ -29,14 +29,15 @@ struct CompletedPageTemplate {
     user_query: Option<String>,
     date_query: Option<String>,
 
-    to_i32: fn(&&String) -> Result<i32>
+    to_i32: fn(&&String) -> Result<i32>,
+    get_field: fn(&BTreeMap<String, String>, &str) -> Result<String>
 }
 #[tracing::instrument]
 pub async fn completed(
     State(app): State<Arc<Mutex<AppState>>>,
     Query(params): Query<HashMap<String, String>>,
     session: Session,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<Response, (StatusCode, String)> {
     info!("[ Got request to build completed page...]");
 
     // Unpack username and query parameters
@@ -180,8 +181,9 @@ pub async fn completed(
         user_query,
         date_query,
 
-        to_i32
+        to_i32,
+        get_field
     };
 
-    Ok(HtmlTemplate(template))
+    try_render_template(&template)
 }

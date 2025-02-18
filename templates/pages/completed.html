@@ -127,8 +127,8 @@
         class="popover__wrapper"
     >
         <div class="popover__content">
-            {{ job["exit_status_tooltip"]|escape("none") }}
+            {{ get_field(job, "exit_status_tooltip")?|escape("none") }}
         </div>
-        {{ job["exit_status"] }} ⓘ
+        {{ get_field(job, "exit_status")? }} ⓘ
     </td>
 {% endblock %}

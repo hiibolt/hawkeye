@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
-use tracing::info;
+use axum::{http::{self, StatusCode}, response::Response};
+use tracing::{error, info};
 use anyhow::{Context, Result};
 
 pub mod running;
@@ -8,6 +9,11 @@ pub mod completed;
 pub mod search;
 pub mod stats;
 
+#[derive(Clone, Debug)]
+enum TableStatType {
+    Default,
+    Colored
+}
 #[derive(Clone)]
 enum TableStat {
     Status,
@@ -32,7 +38,7 @@ enum TableStat {
         sort_by: Option<String>,
         value: String,
         value_unit: Option<String>,
-        colored: bool
+        stat_type: TableStatType
     }
 }
 impl TableStat {
@@ -131,7 +137,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("state")),
                 value: String::from("state"),
                 value_unit: None,
-                colored: false
+                stat_type: TableStatType::Default
             },
             TableStat::StartTime => TableEntry {
                 name: String::from("Start Time"),
@@ -139,7 +145,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("start_time")),
                 value: String::from("start_time"),
                 value_unit: None,
-                colored: false
+                stat_type: TableStatType::Default
             },
             TableStat::EndTime => TableEntry {
                 name: String::from("End Time"),
@@ -147,7 +153,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("end_time")),
                 value: String::from("end_time"),
                 value_unit: None,
-                colored: false
+                stat_type: TableStatType::Default
             },
             TableStat::CpuTime => TableEntry {
                 name: String::from("CPU Time"),
@@ -155,7 +161,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("used_cpu_time")),
                 value: String::from("used_cpu_time"),
                 value_unit: None,
-                colored: false
+                stat_type: TableStatType::Default
             },
             TableStat::UsedMemPerCore => TableEntry {
                 name: String::from("Mem/Core"),
@@ -163,7 +169,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("used_mem_per_cpu")),
                 value: String::from("used_mem_per_cpu"),
                 value_unit: Some(String::from("GB")),
-                colored: false
+                stat_type: TableStatType::Default
             },
             TableStat::UsedMem => TableEntry {
                 name: String::from("Used Mem"),
@@ -171,7 +177,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("used_mem")),
                 value: String::from("used_mem"),
                 value_unit: Some(String::from("GB")),
-                colored: false
+                stat_type: TableStatType::Default
             },
             TableStat::Queue => TableEntry {
                 name: String::from("Queue"),
@@ -179,7 +185,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("queue")),
                 value: String::from("queue"),
                 value_unit: None,
-                colored: false
+                stat_type: TableStatType::Default
             },
             TableStat::RsvdTime => TableEntry {
                 name: String::from("Rsvd Time"),
@@ -187,7 +193,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("req_walltime")),
                 value: String::from("req_walltime"),
                 value_unit: None,
-                colored: false
+                stat_type: TableStatType::Default
             },
             TableStat::RsvdCpus => TableEntry {
                 name: String::from("Rsvd CPUs"),
@@ -195,7 +201,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("req_cpus")),
                 value: String::from("req_cpus"),
                 value_unit: None,
-                colored: false
+                stat_type: TableStatType::Default
             },
             TableStat::RsvdGpus => TableEntry {
                 name: String::from("Rsvd GPUs"),
@@ -203,7 +209,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("req_gpus")),
                 value: String::from("req_gpus"),
                 value_unit: None,
-                colored: false
+                stat_type: TableStatType::Default
             },
             TableStat::RsvdMem => TableEntry {
                 name: String::from("Rsvd Mem"),
@@ -211,7 +217,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("req_mem")),
                 value: String::from("req_mem"),
                 value_unit: Some(String::from("GB")),
-                colored: false
+                stat_type: TableStatType::Default
             },
             TableStat::WalltimeEfficiency => TableEntry {
                 name: String::from("Elapsed Walltime"),
@@ -219,7 +225,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("walltime_efficiency")),
                 value: String::from("walltime_efficiency"),
                 value_unit: None,
-                colored: false
+                stat_type: TableStatType::Default
             },
             TableStat::CpuEfficiency => TableEntry {
                 name: String::from("CPU Usage"),
@@ -227,7 +233,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("cpu_efficiency")),
                 value: String::from("cpu_efficiency"),
                 value_unit: None,
-                colored: true
+                stat_type: TableStatType::Colored
             },
             TableStat::MemEfficiency => TableEntry {
                 name: String::from("Memory Usage"),
@@ -235,7 +241,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("mem_efficiency")),
                 value: String::from("mem_efficiency"),
                 value_unit: None,
-                colored: true
+                stat_type: TableStatType::Colored
             },
             TableStat::NodesChunks => TableEntry {
                 name: String::from("Nodes/Chunks"),
@@ -243,15 +249,15 @@ impl Into<TableEntry> for TableStat {
                 sort_by: None,
                 value: String::from("nodes/chunks"),
                 value_unit: None,
-                colored: false
+                stat_type: TableStatType::Default
             },
-            TableStat::Custom { name, tooltip, sort_by, value, value_unit, colored } => TableEntry {
+            TableStat::Custom { name, tooltip, sort_by, value, value_unit, stat_type } => TableEntry {
                 name,
                 tooltip,
                 sort_by,
                 value,
                 value_unit,
-                colored
+                stat_type
             }
         }
     }
@@ -264,7 +270,7 @@ struct TableEntry {
     sort_by: Option<String>,
     value: String,
     value_unit: Option<String>,
-    colored: bool,
+    stat_type: TableStatType,
 }
 
 // Field helper functions
@@ -299,6 +305,11 @@ fn shorten ( name_field: &&String ) -> String {
     } else {
         (*name_field).clone()
     }
+}
+fn get_field ( job: &BTreeMap<String, String>, field: &str ) -> Result<String> {
+    job.get(field)
+        .ok_or_else(|| anyhow::anyhow!("Field '{}' not found in job!", field))
+        .map(|st| st.to_string())
 }
 
 #[tracing::instrument]
@@ -490,4 +501,27 @@ fn add_exit_status_tooltip ( job: &mut BTreeMap<String, String> ) {
         "<br><br>" +
         "<a href=\"https://www.nas.nasa.gov/hecc/support/kb/pbs-exit-codes_185.html\">More information on PBS exit codes</a>"
     );
+}
+fn try_render_template <T: ?Sized + askama::Template> (
+    template: &T
+) -> Result<Response, (StatusCode, String)> {
+    let value = template.render()
+        .map_err(|err| {
+            error!(%err, "Failed to render template!");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR, 
+                format!("Failed to render template!\n\nError: {err}")
+            )
+        })?
+        .into();
+    Response::builder()
+        .header(
+            http::header::CONTENT_TYPE,
+            http::header::HeaderValue::from_static(T::MIME_TYPE),
+        )
+        .body(value)
+        .map_err(|err| {
+            error!(%err, "Failed to build response!");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Failed to build response!".to_string())
+        })
 }

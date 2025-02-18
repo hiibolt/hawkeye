@@ -101,32 +101,33 @@
         </tr>
         {% for job in jobs %}
             <tr>
-                <td><b>{{ job["pbs_id"] }}</b></td>
+                <td><b>{{ get_field(job, "pbs_id")? }}</b></td>
                 {% block initial_entries %}{% endblock %}
                 {% for table_entry in table_entries %}
-                    {% if table_entry.colored == true %}
-                        {% let eff = job[table_entry.value|as_ref] %}
-                        {% match to_i32(eff) %}
+                    {% match table_entry.stat_type %}
+                    {% when TableStatType::Colored %}
+                        {% let eff = get_field(job, table_entry.value|as_ref)? %}
+                        {% match to_i32(eff|as_ref) %}
                             {% when Ok with (eff) %}
                                 <td
                                     style="background-color: rgba({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0, 0.5);"
                                     class="popover__wrapper"
                                 >
                                     <div class="popover__content">
-                                        {{ job[(table_entry.value.clone() + "_tooltip")|as_ref]|escape("none") }}
+                                        {{ get_field(job, (table_entry.value.clone() + "_tooltip")|as_ref)?|escape("none") }}
                                     </div>
                                     <p style="white-space: nowrap;">{{ eff }}% ⓘ</p>
                                 </td>
                             {% when Err with (_) %}
                                 <td style="background-color: rgba(255, 255, 0, 0.5);">{{ eff }}%</td>
                         {% endmatch %}
-                    {% else %}
-                        <td>{{ job[table_entry.value|as_ref] }}{{ table_entry.value_unit.clone().unwrap_or(String::new()) }}</td>
-                    {% endif %}
+                    {% when TableStatType::Default %}
+                        <td>{{ get_field(job, table_entry.value|as_ref)? }}{{ table_entry.value_unit.clone().unwrap_or(String::new()) }}</td>
+                    {% endmatch %}
                 {% endfor %}
                 {% block ending_entries %}{% endblock %}
                 <td>
-                    <a href="stats?id={{ job["pbs_id"] }}">
+                    <a href="stats?id={{ get_field(job, "pbs_id")? }}">
                         <button class="table-button">View Detailed Stats</button>
                     </a>
                 </td>

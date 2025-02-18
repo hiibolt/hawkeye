@@ -1,11 +1,11 @@
-use super::super::HtmlTemplate;
+use super::try_render_template;
 
 use std::collections::HashMap;
 
 use anyhow::Result;
 use axum::{
-    extract::Query, response::IntoResponse,
-    http::StatusCode
+    extract::Query,
+    http::StatusCode, response::Response
 };
 use tower_sessions::Session;
 use askama::Template;
@@ -22,7 +22,7 @@ struct LoginPageTemplate {
 pub async fn login(
     Query(params): Query<HashMap<String, String>>,
     session: Session,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
+) -> Result<Response, (StatusCode, String)> {
     info!("[ Got request to build login page...]");
 
     let template = LoginPageTemplate {
@@ -36,5 +36,5 @@ pub async fn login(
             .unwrap_or(false)
     };
 
-    Ok(HtmlTemplate(template))
+    try_render_template(&template)
 }

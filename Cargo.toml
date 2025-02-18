@@ -3,6 +3,9 @@ name = "hawkeye"
 version = "0.1.0"
 edition = "2021"
 
+[profile.dev.package.askama_derive]
+opt-level = 3
+
 [dependencies]
 anyhow = "1.0.95"
 askama = { version = "0.12.1", features = [ "serde-json" ] }
