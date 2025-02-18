@@ -103,18 +103,30 @@ pub async fn running(
         TableStat::RsvdMem,
         TableStat::WalltimeEfficiency,
         TableStat::CpuEfficiency,
-        TableStat::MemEfficiency,
+        TableStat::MemEfficiency
     );
+    let mut errors = Vec::new();
     jobs = jobs.into_iter()
         .map(|mut job| {
             for table_stat in table_stats.iter() {
-                table_stat.adjust_job(&mut job);
+                if let Err(e) = table_stat.adjust_job(&mut job) {
+                    errors.push(e);
+                }
+                if let Err(e) = table_stat.ensure_needed_field(&mut job) {
+                    errors.push(e);
+                }
             }
 
             job
         })
         .rev()
         .collect();
+    let errors = errors.iter()
+        .map(|e| e.to_string())
+        .enumerate()
+        .map(|(i, e)| format!("{}. {}", i + 1, e))
+        .collect::<Vec<String>>()
+        .join("<br>");
 
     // Build template
     let template = RunningPageTemplate {
@@ -126,8 +138,8 @@ pub async fn running(
             chrono::Local::now()
                 .format("%b %e, %Y at %l:%M%p")
         ),
-        alert: None,
-        jobs,
+        jobs: if errors.len() == 0 { jobs } else { Vec::new() },
+        alert: (!errors.is_empty()).then_some(format!("<b>There were internal errors!</b><br><br>{errors}")),
         table_entries: table_stats.into_iter()
             .map(|table_stat| table_stat.into() )
             .collect(),

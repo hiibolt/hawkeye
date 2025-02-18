@@ -8,6 +8,7 @@ pub mod completed;
 pub mod search;
 pub mod stats;
 
+#[derive(Clone)]
 enum TableStat {
     Status,
     StartTime,
@@ -24,6 +25,7 @@ enum TableStat {
     CpuEfficiency,
     MemEfficiency,
     NodesChunks,
+    #[allow(dead_code)]
     Custom {
         name: String,
         tooltip: String,
@@ -104,6 +106,18 @@ impl TableStat {
             },
             _ => {}
         };
+
+        Ok(())
+    }
+    fn ensure_needed_field (
+        &self,
+        job: &mut BTreeMap<String, String>
+    ) -> Result<()> {
+        let value = Into::<TableEntry>::into(self.clone()).value;
+
+        if job.get(&value).is_none() {
+            return Err(anyhow::anyhow!("Field '{}' not found in job!", value));
+        }
 
         Ok(())
     }

@@ -249,7 +249,7 @@
             {% match alert %}
                 {% when Some with (alert) %}
                     <p id="alert-footer" style="text-align:center">
-                        {{ alert }}
+                        {{ alert|as_ref|escape("none") }}
                     </p>
                 {% when None %}
                     {% if jobs.len() == 0 %}

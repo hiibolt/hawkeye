@@ -125,18 +125,30 @@ pub async fn completed(
         TableStat::CpuEfficiency,
         TableStat::MemEfficiency
     );
+    let mut errors = Vec::new();
     jobs = jobs.into_iter()
         .map(|mut job| {
             // Add tooltip for exit status
             add_exit_status_tooltip(&mut job);
 
             for table_stat in table_stats.iter() {
-                table_stat.adjust_job(&mut job);
+                if let Err(e) = table_stat.adjust_job(&mut job) {
+                    errors.push(e);
+                }
+                if let Err(e) = table_stat.ensure_needed_field(&mut job) {
+                    errors.push(e);
+                }
             }
 
             job
         })
         .collect();
+    let errors = errors.iter()
+        .map(|e| e.to_string())
+        .enumerate()
+        .map(|(i, e)| format!("{}. {}", i + 1, e))
+        .collect::<Vec<String>>()
+        .join("\n");
 
     // Build the header and template
     let header = if let Some(ref user_query) = user_query {
@@ -149,13 +161,17 @@ pub async fn completed(
         String::from("Completed Jobs on Metis")
     };
     let template = CompletedPageTemplate {
-        // Cool compiler magic here :3c (avoids cloning)
-        alert: if username.is_none() { Some("You are not logged in!".to_string()) } else { None },
+        // Cool compiler magic here :3c (avoids cloning) [twice now!]
+        jobs: if !errors.is_empty() { vec!() } else { jobs },
+        alert: if username.is_none() { 
+            Some("You are not logged in!".to_string())
+        } else {
+            (!errors.is_empty()).then_some(format!("<b>There were internal errors!</b><br><br>{errors}"))
+        },
         username,
         needs_login: true,
         title: String::from("Completed Jobs - CRCD Batchmon"),
         header,
-        jobs,
 
         table_entries: table_stats.into_iter()
             .map(|table_stat| table_stat.into() )
