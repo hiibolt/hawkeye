@@ -52,48 +52,49 @@
             {% block initial_headers %}{% endblock %}
             {% for table_entry in table_entries %}
                 <th class="popover__wrapper">
-                    {% if table_entry.sort_by == "NOT_SORTABLE" %}
+                    {% match table_entry.sort_by %}
+                    {% when None %}
                         {{ table_entry.name }}
-                    {% else %}
-                        <!-- Black text -->
-                        <a href="#" id="{{ table_entry.name }}"
-                            style="color: black;"
-                        >{{ table_entry.name }}
-                        </a>
-                    {% endif %}
+                    {% when Some with (sortable) %}
+                    <!-- Black text -->
+                    <a href="#" id="{{ table_entry.name }}"
+                        style="color: black;"
+                    >{{ table_entry.name }}
+                    </a>
+                    <script>
+                        document.getElementById("{{ table_entry.name }}").addEventListener("click", function(event) {
+                            event.preventDefault(); // Prevent default link behavior
+                
+                            // The sort parameter you want to add
+                            const sortText = "{{ sortable }}"; // This could be dynamic, based on your specific sorting logic
+                
+                            // Get the current URL
+                            const currentUrl = window.location.href;
+                
+                            // Create a URL object to easily manipulate the query parameters
+                            const url = new URL(currentUrl);
+                
+                            // Set the sort parameter
+                            url.searchParams.set("sort", sortText);
+                
+                            // Toggle the 'reverse' parameter: if it's already true, remove it; otherwise, set it to true
+                            if (url.searchParams.has("reverse")) {
+                                // If reverse is already set, toggle it off
+                                url.searchParams.delete("reverse");
+                            } else {
+                                // If reverse isn't set, add it
+                                url.searchParams.set("reverse", "true");
+                            }
+                
+                            // Redirect to the new URL with the updated query string
+                            window.location.href = url.toString();
+                        });
+                    </script>
+                    {% endmatch %}
                     <div class="popover__content" style="font-weight:normal;">
                         {{ table_entry.tooltip|as_ref|escape("none") }}
                     </div>
                 </th>
-                <script>
-                    document.getElementById("{{ table_entry.name }}").addEventListener("click", function(event) {
-                        event.preventDefault(); // Prevent default link behavior
-            
-                        // The sort parameter you want to add
-                        const sortText = "{{ table_entry.sort_by}}"; // This could be dynamic, based on your specific sorting logic
-            
-                        // Get the current URL
-                        const currentUrl = window.location.href;
-            
-                        // Create a URL object to easily manipulate the query parameters
-                        const url = new URL(currentUrl);
-            
-                        // Set the sort parameter
-                        url.searchParams.set("sort", sortText);
-            
-                        // Toggle the 'reverse' parameter: if it's already true, remove it; otherwise, set it to true
-                        if (url.searchParams.has("reverse")) {
-                            // If reverse is already set, toggle it off
-                            url.searchParams.delete("reverse");
-                        } else {
-                            // If reverse isn't set, add it
-                            url.searchParams.set("reverse", "true");
-                        }
-            
-                        // Redirect to the new URL with the updated query string
-                        window.location.href = url.toString();
-                    });
-                </script>
             {% endfor %}
             {% block ending_headers %}{% endblock %}
             <th>More</th>
@@ -107,30 +108,20 @@
                         {% let eff = job[table_entry.value|as_ref] %}
                         {% match to_i32(eff) %}
                             {% when Ok with (eff) %}
-                                {% if eff > 100|as_ref %}
-                                    <td
-                                        style="background-color: rgba(255, 255, 0, 0.5);"
-                                        class="popover__wrapper"
-                                        >
-                                        <div class="popover__content">
-                                            {{ job[(table_entry.value.clone() + "_tooltip")|as_ref]|escape("none") }}
-                                        </div>
-                                {% else %}
-                                    <td
-                                        style="background-color: rgba({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0, 0.5);"
-                                        class="popover__wrapper"
-                                    >
+                                <td
+                                    style="background-color: rgba({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0, 0.5);"
+                                    class="popover__wrapper"
+                                >
                                     <div class="popover__content">
                                         {{ job[(table_entry.value.clone() + "_tooltip")|as_ref]|escape("none") }}
                                     </div>
-                                {% endif %}
                                     <p style="white-space: nowrap;">{{ eff }}% ⓘ</p>
                                 </td>
                             {% when Err with (_) %}
                                 <td style="background-color: rgba(255, 255, 0, 0.5);">{{ eff }}%</td>
                         {% endmatch %}
                     {% else %}
-                        <td>{{ job[table_entry.value|as_ref] }}{{ table_entry.value_unit }}</td>
+                        <td>{{ job[table_entry.value|as_ref] }}{{ table_entry.value_unit.clone().unwrap_or(String::new()) }}</td>
                     {% endif %}
                 {% endfor %}
                 {% block ending_entries %}{% endblock %}

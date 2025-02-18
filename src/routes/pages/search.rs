@@ -1,5 +1,5 @@
 use super::super::{HtmlTemplate, AppState};
-use super::{TableEntry, to_i32, timestamp_field_to_date, shorten, sort_jobs, add_efficiency_tooltips, add_exit_status_tooltip};
+use super::{TableEntry, TableStat, to_i32, timestamp_field_to_date, shorten, sort_jobs, add_efficiency_tooltips, add_exit_status_tooltip};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -162,28 +162,18 @@ pub async fn search(
         header: String::from("Search"),
         jobs,
         table_entries: vec![
-            ("Queue", "queue", "queue", "", false),
-            ("State", "state", "state", "", false),
-            ("Walltime", "req_walltime", "req_walltime", "", false),
-            ("# of CPUs", "req_cpus", "req_cpus", "", false),
-            ("Nodes/Chunks", "chunks", "nodes/chunks", "", false),
-            ("Requested Mem", "req_mem", "req_mem", "GB", false),
-            ("End Date", "end_time", "end_time", "", false),
-            ("Used Mem/Core", "NOT_SORTABLE", "used_mem_per_cpu", "GB", false),
-            ("Used Mem", "used_mem", "used_mem", "GB", false),
-            ("Used Walltime", "used_walltime", "used_walltime", "", false),
-            ("Req/Used CPU", "cpu_efficiency", "cpu_efficiency", "", true),
-            ("Req/Used Mem", "mem_efficiency", "mem_efficiency", "", true),
-            ("Req/Used Walltime", "walltime_efficiency", "walltime_efficiency", "", true)
+            TableStat::Status,
+            TableStat::StartTime,
+            TableStat::Queue,
+            TableStat::RsvdTime,
+            TableStat::RsvdCpus,
+            TableStat::RsvdGpus,
+            TableStat::RsvdMem,
+            TableStat::WalltimeEfficiency,
+            TableStat::CpuEfficiency,
+            TableStat::MemEfficiency,
         ].into_iter()
-            .map(|(name, sort_by, value, value_units, colored)| TableEntry {
-                name: name.to_string(),
-                tooltip: String::from(""),
-                sort_by: sort_by.to_string(),
-                value: value.to_string(),
-                value_unit: value_units.to_string(),
-                colored
-            })
+            .map(|table_stat| table_stat.into() )
             .collect(),
 
         state_query: params.get("state").and_then(|st| Some(st.to_owned())),

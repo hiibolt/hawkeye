@@ -1,5 +1,5 @@
 use super::super::{HtmlTemplate, AppState};
-use super::{sort_jobs, timestamp_field_to_date, to_i32, TableEntry, add_efficiency_tooltips, add_exit_status_tooltip};
+use super::{sort_jobs, to_i32, TableEntry, TableStat, add_exit_status_tooltip};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -113,35 +113,26 @@ pub async fn completed(
     );
 
     // Tweak data to be presentable and add tooltips for efficiencies
+    let table_stats = vec!(
+        TableStat::RsvdCpus,
+        TableStat::NodesChunks,
+        TableStat::RsvdMem,
+        TableStat::EndTime,
+        TableStat::UsedMemPerCore,
+        TableStat::UsedMem,
+        TableStat::CpuTime,
+        TableStat::WalltimeEfficiency,
+        TableStat::CpuEfficiency,
+        TableStat::MemEfficiency
+    );
     jobs = jobs.into_iter()
         .map(|mut job| {
-            job.insert(
-                String::from("used_mem_per_cpu"),
-                ( job.get("used_mem")
-                    .and_then(|st| st.parse::<f32>().ok())
-                    .unwrap_or(0f32) /
-                job.get("req_cpus")
-                    .and_then(|st| st.parse::<f32>().ok())
-                    .unwrap_or(1f32) )
-                    .to_string()
-            );
-            job.insert(
-                String::from("nodes/chunks"),
-                format!("{}/{}", 
-                    job.get("nodes").unwrap_or(&"".to_string())
-                        .split(',').collect::<Vec<&str>>().len(),
-                    job.get("chunks").unwrap_or(&"0".to_string())
-                )
-            );
-            if let Some(end_time_str_ref) = job.get_mut("end_time") {
-                timestamp_field_to_date(end_time_str_ref);
-            }
-
-            // Add tooltips for efficiencies
-            add_efficiency_tooltips(&mut job);
-
             // Add tooltip for exit status
             add_exit_status_tooltip(&mut job);
+
+            for table_stat in table_stats.iter() {
+                table_stat.adjust_job(&mut job);
+            }
 
             job
         })
@@ -165,27 +156,9 @@ pub async fn completed(
         title: String::from("Completed Jobs - CRCD Batchmon"),
         header,
         jobs,
-        table_entries: vec![
-            ("# of CPUs", "req_cpus", "req_cpus", "", false),
-            ("Nodes/Chunks", "chunks", "nodes/chunks", "", false),
-            ("Requested Mem", "req_mem", "req_mem", "GB", false),
-            ("End Date", "end_time", "end_time", "", false),
-            ("Used Mem/Core", "NOT_SORTABLE", "used_mem_per_cpu", "GB", false),
-            ("Used Mem", "used_mem", "used_mem", "GB", false),
-            ("Used Walltime", "used_walltime", "used_walltime", "", false),
-            ("Used CPU Time", "used_cpu_time", "used_cpu_time", "", false),
-            ("Req/Used CPU", "cpu_efficiency", "cpu_efficiency", "", true),
-            ("Req/Used Mem", "mem_efficiency", "mem_efficiency", "", true),
-            ("Req/Used Walltime", "walltime_efficiency", "walltime_efficiency", "", true)
-        ].into_iter()
-            .map(|(name, sort_by, value, value_units, colored)| TableEntry {
-                name: name.to_string(),
-                tooltip: String::from(""),
-                sort_by: sort_by.to_string(),
-                value: value.to_string(),
-                value_unit: value_units.to_string(),
-                colored
-            })
+
+        table_entries: table_stats.into_iter()
+            .map(|table_stat| table_stat.into() )
             .collect(),
 
         user_query,

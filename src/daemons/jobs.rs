@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, bail, Context, Result};
 use regex::Regex;
 use tracing::{error, info};
 use tokio::task::JoinSet;
@@ -187,7 +187,9 @@ pub async fn old_jobs_daemon (
     }
 }
 #[tracing::instrument]
-async fn grab_jobs_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
+async fn grab_jobs_helper (
+    app: Arc<Mutex<AppState>>
+) -> Result<()> {
     let (username, hostname) = {
         let state = app.lock().await;
         
@@ -201,12 +203,53 @@ async fn grab_jobs_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
         vec!["-anL"],
         true
     ).await
-        .context("Failed to run remote command!")?;
+        .context("Failed to run remote command!")?
+        .replace("\r", "");
 
-    let job_strs: Vec<&str> = jobstat_output.split("--------------------\r\n")
+    let cluster_status_data_raw = jobstat_output.split("nodes: ")
+        .nth(1)
+        .ok_or(anyhow!("Invalid cluster status input! Input:\n{jobstat_output:?}"))?
+        .replace("CPU cores: ", "")
+        .replace("GPU cores: ", "")
+        .replace("used + ", "")
+        .replace("unused = ", "")
+        .replace(" total", "")
+        .replace("status: [R]unning", "");
+    let node_stats = cluster_status_data_raw.split("\n")
+        .next()
+        .context("Invalid cluster status (nodes) input! Input:\n{cluster_status_data_raw:?}")?
+        .split(" ")
+        .collect::<Vec<&str>>();
+    let cpu_stats = cluster_status_data_raw.split("\n")
+        .nth(1)
+        .context("Invalid cluster status (CPUs) input! Input:\n{cluster_status_data_raw:?}")?
+        .split(" ")
+        .collect::<Vec<&str>>();
+    let gpu_stats = cluster_status_data_raw.split("\n")
+        .nth(2)
+        .context("Invalid cluster status (GPUs) input! Input:\n{cluster_status_data_raw:?}")?
+        .split(" ")
+        .collect::<Vec<&str>>();
+
+    if node_stats.len() != 3 || cpu_stats.len() != 3 || gpu_stats.len() != 3 {
+        bail!("Invalid cluster status data!")
+    }
+    
+    let mut app_lock = app.lock().await;
+    app_lock.status = Some(crate::routes::ClusterStatus {
+        total_nodes: node_stats[2].parse::<u32>()?,
+        used_nodes: node_stats[0].parse::<u32>()?,
+        total_cpus: cpu_stats[2].parse::<u32>()?,
+        used_cpus: cpu_stats[0].parse::<u32>()?,
+        total_gpus: gpu_stats[2].parse::<u32>()?,
+        used_gpus: gpu_stats[0].parse::<u32>()?
+    });
+    drop(app_lock);
+
+    let job_strs: Vec<&str> = jobstat_output.split("--------------------\n")
         .nth(1)
         .with_context(|| format!("Invalid input! Input:\n{jobstat_output}"))?
-        .split("\r\n\r\n")
+        .split("\n\n")
         .collect();
 
     let jobs = job_strs.iter()

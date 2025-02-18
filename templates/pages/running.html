@@ -2,7 +2,32 @@
 
 {% block navbar %}
     <div class="nav-item">
-        <h2><code>jobstat</code></h2>
+        <h2>Cluster Usage Summary</h2>
+    </div>
+    <div class="nav-item">
+        {% match cluster_status %}
+            {% when Some with (status) %}
+                <p>
+                    <b>Nodes ({{status.total_nodes}} total)</b>
+                    <br>
+                    <br>
+                    {{status.used_nodes}} in use / {{status.total_nodes - status.used_nodes}} available
+                </p>
+                <p>
+                    <b>CPU Cores ({{status.total_cpus}} total)</b>
+                    <br>
+                    <br>
+                    {{status.used_cpus}} in use / {{status.total_cpus - status.used_cpus}} available
+                </p>
+                <p>
+                    <b>GPU Cards ({{status.total_gpus}} total)</b>
+                    <br>
+                    <br>
+                    {{status.used_gpus}} in use / {{status.total_gpus - status.used_gpus}} available
+                </p>
+            {% when None %}
+                <p>Cluster Status: <span style="color: red;">Unknown</span></p>
+        {% endmatch %}
     </div>
     <div class="nav-item">
         <p>This page is a wrapper around the <code>jobstat -anL</code> and <code>grep</code> commands, which returns a list of all running jobs on Metis.</p>

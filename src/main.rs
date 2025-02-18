@@ -41,7 +41,9 @@ async fn main() -> ! {
         db: DB::new(
             &std::env::var("DB_PATH")
                 .expect("Missing `DB_PATH` environment variable!")
-        ).expect("Failed to establish connection to DB!")
+        ).expect("Failed to establish connection to DB!"),
+
+        status: None
     }));
     
     info!("[ Starting daemons... ]");

@@ -13,11 +13,23 @@ use axum::http::header;
 pub mod api;
 pub mod pages;
 
+#[derive(Debug, Clone, Copy)]
+pub struct ClusterStatus {
+    pub total_nodes: u32,
+    pub used_nodes:  u32,
+    pub total_cpus:  u32,
+    pub used_cpus:   u32,
+    pub total_gpus:  u32,
+    pub used_gpus:   u32,
+}
+
 #[derive(Debug)]
 pub struct AppState {
     pub remote_username: String,
     pub remote_hostname: String,
-    pub db: super::DB
+    pub db: super::DB,
+
+    pub status: Option<ClusterStatus>
 }
 
 struct HtmlTemplate<T>(T);
