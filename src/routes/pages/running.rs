@@ -86,6 +86,7 @@ pub async fn running(
     
     // Tweak data to be presentable and add tooltips for efficiencies
     let (table_entries, errors) = sort_build_parse(
+        app.clone(),
         vec!(
             TableStat::JobID,
             TableStat::JobOwner,
@@ -106,7 +107,7 @@ pub async fn running(
         &mut jobs,
         &params,
         username.clone()
-    );
+    ).await;
     
     // Build template
     let template = RunningPageTemplate {

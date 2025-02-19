@@ -103,6 +103,7 @@ pub async fn search(
 
     // Tweak data to be presentable and add tooltips for efficiencies
     let (table_entries, errors) = sort_build_parse(
+        app.clone(),
         vec!(
             TableStat::JobID,
             TableStat::JobOwner,
@@ -130,7 +131,7 @@ pub async fn search(
         &mut jobs,
         &params,
         username.clone()
-    );
+    ).await;
 
     // Build jobs and template
     let template = SearchPageTemplate {

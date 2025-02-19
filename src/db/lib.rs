@@ -387,6 +387,18 @@ impl DB {
     }
 
     #[tracing::instrument]
+    pub fn get_groups_for_user (
+        &mut self,
+
+        username: &str
+    ) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT group_name FROM UserGroups WHERE user_name = ?1")?;
+        let rows = stmt.query_map([username], |row| row.get::<_, String>(0))?;
+    
+        Ok(rows.flatten().collect())
+    }
+
+    #[tracing::instrument]
     pub fn _get_group_jobs (
         &mut self,
         filter_state: Option<&String>,

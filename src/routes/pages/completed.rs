@@ -93,6 +93,7 @@ pub async fn completed(
 
     // Tweak data to be presentable and add tooltips for efficiencies
     let (table_entries, errors) = sort_build_parse(
+        app.clone(),
         vec!(
             TableStat::JobID,
             TableStat::JobOwner,
@@ -113,7 +114,7 @@ pub async fn completed(
         &mut jobs,
         &params,
         username.clone()
-    );
+    ).await;
 
     // Build the template
     let template = CompletedPageTemplate {

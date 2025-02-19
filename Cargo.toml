@@ -3,14 +3,12 @@ name = "hawkeye"
 version = "0.1.0"
 edition = "2021"
 
-[profile.dev.package.askama_derive]
-opt-level = 3
-
 [dependencies]
 anyhow = "1.0.95"
 askama = { version = "0.12.1", features = [ "serde-json" ] }
 axum = "0.8.1"
 chrono = "0.4.39"
+futures = "0.3.31"
 openssh = { version = "0.11.2", features = [ "native-mux" ] }
 regex = "1.11.1"
 rusqlite = "0.33.0"

@@ -1,7 +1,10 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 use axum::{http::{self, StatusCode}, response::Response};
+use tokio::sync::Mutex;
 use tracing::{error, info};
 use anyhow::{Context, Result};
+
+use super::AppState;
 
 pub mod running;
 pub mod login;
@@ -28,6 +31,7 @@ enum TableStat {
     JobOwner,
     JobName,
     JobNameMini,
+    Groups,
     Status,
     StartTime,
     EndTime,
@@ -57,13 +61,34 @@ enum TableStat {
     }
 }
 impl TableStat {
-    fn adjust_job (
+    async fn adjust_job (
         &self,
-        job: &mut BTreeMap<String, String>
+        app: Arc<Mutex<AppState>>,
+        job: Arc<Mutex<&mut BTreeMap<String, String>>>
     ) -> Result<()> {
         match self {
+            TableStat::Groups => {
+                let owner = job.lock().await.get("owner")
+                    .context("Failed to get owner!")?
+                    .clone();
+                let groups = app.lock()
+                    .await
+                    .db
+                    .get_groups_for_user(&owner)
+                    .map_err(|e| {
+                        error!(%e, "Failed to get groups for user!");
+                        e
+                    })?;
+
+                job.lock().await.insert(
+                    String::from("groups"),
+                    groups.join(", ")
+                );
+            }
             TableStat::StartTime => {
-                let start_time_str_ref = job.get_mut("start_time")
+                let mut job = job.lock().await;
+                let start_time_str_ref = job
+                    .get_mut("start_time")
                     .context("Failed to get start time!")?;
 
                 if start_time_str_ref == "2147483647" {
@@ -73,6 +98,7 @@ impl TableStat {
                 }
             },
             TableStat::EndTime => {
+                let mut job = job.lock().await;
                 let end_time_str_ref = job.get_mut("end_time")
                     .context("Failed to get end time!")?;
 
@@ -83,39 +109,45 @@ impl TableStat {
                 }
             },
             TableStat::UsedMemPerCore => {
+                let mut job = job.lock().await;
+                let value = format!("{:.2}",
+                    ( job.get("used_mem")
+                        .and_then(|st| st.parse::<f32>().ok())
+                        .unwrap_or(0f32) /
+                    job.get("req_cpus")
+                        .and_then(|st| st.parse::<f32>().ok())
+                        .unwrap_or(1f32) )
+                );
                 job.insert(
                     String::from("used_mem_per_cpu"),
-                    format!("{:.2}",
-                        ( job.get("used_mem")
-                            .and_then(|st| st.parse::<f32>().ok())
-                            .unwrap_or(0f32) /
-                        job.get("req_cpus")
-                            .and_then(|st| st.parse::<f32>().ok())
-                            .unwrap_or(1f32) )
-                    )
+                    value
                 );
             }
             TableStat::NodesChunks => {
+                let mut job = job.lock().await;
+                let value = format!("{}/{}", 
+                    job.get("nodes").unwrap_or(&"".to_string())
+                        .split(',').collect::<Vec<&str>>().len(),
+                    job.get("chunks").unwrap_or(&"0".to_string())
+                );
                 job.insert(
                     String::from("nodes/chunks"),
-                    format!("{}/{}", 
-                        job.get("nodes").unwrap_or(&"".to_string())
-                            .split(',').collect::<Vec<&str>>().len(),
-                        job.get("chunks").unwrap_or(&"0".to_string())
-                    )
+                    value
                 );
             }
             TableStat::RsvdGpus => {
+                let mut job = job.lock().await;
                 if job.get("req_gpus").is_none() {
                     job.insert(String::from("req_gpus"), String::from("0"));
                 }
             },
             TableStat::CpuEfficiency | TableStat::MemEfficiency => {
-                add_efficiency_tooltips(job);
+                add_efficiency_tooltips(*job.lock().await);
             },
             TableStat::ElapsedWalltime | TableStat::ElapsedWalltimeColored => {
-                add_efficiency_tooltips(job);
+                add_efficiency_tooltips(*job.lock().await);
 
+                let mut job = job.lock().await;
                 let walltime_efficiency_ref = job.get_mut("walltime_efficiency")
                     .context("Failed to get walltime efficiency!")?;
 
@@ -131,13 +163,13 @@ impl TableStat {
 
         Ok(())
     }
-    fn ensure_needed_field (
+    async fn ensure_needed_field (
         &self,
-        job: &mut BTreeMap<String, String>
+        job: Arc<Mutex<&mut BTreeMap<String, String>>>
     ) -> Result<()> {
         let value = Into::<TableEntry>::into(self.clone()).value;
 
-        if job.get(&value).is_none() {
+        if job.lock().await.get(&value).is_none() {
             return Err(anyhow::anyhow!("Field '{}' not found in job!", value));
         }
 
@@ -178,6 +210,14 @@ impl Into<TableEntry> for TableStat {
                 value: String::from("name"),
                 value_unit: None,
                 stat_type: TableStatType::JobNameMini
+            },
+            TableStat::Groups => TableEntry {
+                name: String::from("Groups"),
+                tooltip: String::from("<b>Groups</b>"),
+                sort_by: None,
+                value: String::from("groups"),
+                value_unit: None,
+                stat_type: TableStatType::Default
             },
             TableStat::Status => TableEntry {
                 name: String::from("Status"),
@@ -602,59 +642,73 @@ fn try_render_template <T: ?Sized + askama::Template> (
         })
 }
 #[tracing::instrument]
-    fn sort_build_parse (
-        table_stats: Vec<TableStat>,
+async fn sort_build_parse (
+    app: Arc<Mutex<AppState>>,
 
-        jobs: &mut Vec<BTreeMap<String, String>>,
-        params: &HashMap<String, String>,
-        username: Option<String>
-    ) -> (
-        Vec<TableEntry>, // Table entries
-        Option<String>,  // Error string
-    ) {
-        // Sort the jobs by any sort and reverse queries
-        sort_jobs(
-            jobs,
-            params.get("sort"),
-            params.get("reverse"),
-            username.is_some()
-        );
+    table_stats: Vec<TableStat>,
 
-        // Tweak data to be presentable and add tooltips for efficiencies
-        let mut errors = Vec::new();
-        for job_ref in jobs.iter_mut() {
-            // Add tooltip for exit status
-            add_exit_status_tooltip(job_ref);
+    jobs: &mut Vec<BTreeMap<String, String>>,
+    params: &HashMap<String, String>,
+    username: Option<String>
+) -> (
+    Vec<TableEntry>, // Table entries
+    Option<String>,  // Error string
+) {
+    // Sort the jobs by any sort and reverse queries
+    sort_jobs(
+        jobs,
+        params.get("sort"),
+        params.get("reverse"),
+        username.is_some()
+    );
 
-            for table_stat in table_stats.iter() {
-                if let Err(e) = table_stat.adjust_job(job_ref) {
-                    errors.push(e);
-                }
-                if let Err(e) = table_stat.ensure_needed_field(job_ref) {
-                    errors.push(e);
-                }
-            }
-        }
-        let errors = errors
-            .iter()
-            .map(|e| e.to_string())
-            .enumerate()
-            .map(|(i, e)| format!("{}. {}", i + 1, e))
-            .collect::<Vec<String>>()
-            .join("\n");
+    // Tweak data to be presentable and add tooltips for efficiencies
+    let mut errors = Vec::new();
+    let errors_lock = Arc::new(Mutex::new(&mut errors));
+    for job_ref in jobs.iter_mut() {
+        // Add tooltip for exit status
+        add_exit_status_tooltip(job_ref);
 
-        // If there are errors, wipe the jobs
-        if !errors.is_empty() {
-            jobs.clear();
+        let job_lock = Arc::new(Mutex::new(job_ref));
 
-            // Print the errors if there are any
-            error!(%errors, "Errors while parsing jobs!");
-        }
-
-        (
-            table_stats.into_iter()
-                .map(|table_stat| table_stat.into() )
-                .collect(),
-            (!errors.trim().is_empty()).then_some(errors)
-        )
+        let tasks: Vec<_> = table_stats.clone().into_iter()
+            .map(|table_stat| {
+                let app_cloned = app.clone();
+                let job_lock_cloned = job_lock.clone();
+                let errors_lock_cloned = errors_lock.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = table_stat.adjust_job(app_cloned, job_lock_cloned.clone()).await {
+                        errors_lock_cloned.lock().await.push(e);
+                    }
+                    if let Err(e) = table_stat.ensure_needed_field(job_lock_cloned).await {
+                        errors_lock_cloned.lock().await.push(e);
+                    }
+                })
+            })
+            .collect();
+        futures::future::join_all(tasks).await;
     }
+    drop(errors_lock);
+    let errors = errors
+        .iter()
+        .map(|e| e.to_string())
+        .enumerate()
+        .map(|(i, e)| format!("{}. {}", i + 1, e))
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    // If there are errors, wipe the jobs
+    if !errors.is_empty() {
+        jobs.clear();
+
+        // Print the errors if there are any
+        error!(%errors, "Errors while parsing jobs!");
+    }
+
+    (
+        table_stats.into_iter()
+            .map(|table_stat| table_stat.into() )
+            .collect(),
+        (!errors.trim().is_empty()).then_some(errors)
+    )
+}
