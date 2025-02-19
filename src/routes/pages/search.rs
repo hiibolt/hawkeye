@@ -1,5 +1,5 @@
 use super::super::AppState;
-use super::{try_render_template, TableEntry, TableStat, TableStatType, Toolkit, sort_jobs, add_efficiency_tooltips, add_exit_status_tooltip, timestamp_field_to_date};
+use super::{try_render_template, TableEntry, TableStat, TableStatType, Toolkit, sort_build_parse};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -101,80 +101,58 @@ pub async fn search(
         vec!()
     };
 
-    // Sort the jobs by any sort and reverse queries
-    sort_jobs(
-        &mut jobs,
-        params.get("sort"),
-        params.get("reverse"),
-        username.is_some()
-    );
-
     // Tweak data to be presentable and add tooltips for efficiencies
-    jobs = jobs.into_iter()
-        .map(|mut job| {
-            job.insert(
-                String::from("used_mem_per_cpu"),
-                ( job.get("used_mem")
-                    .and_then(|st| st.parse::<f32>().ok())
-                    .unwrap_or(0f32) /
-                job.get("req_cpus")
-                    .and_then(|st| st.parse::<f32>().ok())
-                    .unwrap_or(1f32) )
-                    .to_string()
-            );
-            job.insert(
-                String::from("nodes/chunks"),
-                format!("{}/{}", 
-                    job.get("nodes").unwrap_or(&"".to_string())
-                        .split(',').collect::<Vec<&str>>().len(),
-                    job.get("chunks").unwrap_or(&"0".to_string())
-                )
-            );
-            if let Some(end_time_str_ref) = job.get_mut("end_time") {
-                timestamp_field_to_date(end_time_str_ref);
-            }
-            
-            // Add tooltips for efficiencies
-            add_efficiency_tooltips(&mut job);
-
-            // Add tooltip for exit status
-            add_exit_status_tooltip(&mut job);
-
-            job
-        })
-        .rev()
-        .collect();
-
-    // Build jobs and template
-    let template = SearchPageTemplate {
-        alert: if username.is_none() { 
-            Some("You are not logged in!".to_string())
-        } else { 
-            if any_filters {
-                None
-            } else {
-                Some("Choose your filters and click search!".to_string())
-            }
-        },
-        username,
-        needs_login: true,
-        title: String::from("Search - CRCD Batchmon"),
-        header: String::from("Search"),
-        jobs,
-        table_entries: vec![
+    let (table_entries, errors) = sort_build_parse(
+        vec!(
+            TableStat::JobID,
+            TableStat::JobOwner,
+            TableStat::JobNameMini,
             TableStat::Status,
             TableStat::StartTime,
+            TableStat::EndTime,
+            TableStat::CpuTime,
+            TableStat::UsedMemPerCore,
+            TableStat::UsedMem,
             TableStat::Queue,
             TableStat::RsvdTime,
             TableStat::RsvdCpus,
             TableStat::RsvdGpus,
             TableStat::RsvdMem,
+            TableStat::ElapsedWalltime,
+            TableStat::NodesChunks,
             TableStat::ElapsedWalltimeColored,
             TableStat::CpuEfficiency,
             TableStat::MemEfficiency,
-        ].into_iter()
-            .map(|table_stat| table_stat.into() )
-            .collect(),
+            TableStat::ExitStatus,
+            TableStat::More,
+        ),
+
+        &mut jobs,
+        &params,
+        username.clone()
+    );
+
+    // Build jobs and template
+    let template = SearchPageTemplate {
+        alert: if username.is_none() {
+                Some("You are not logged in!".to_string())
+            } else {
+                if errors.is_some() {
+                    errors
+                } else {
+                    if any_filters {
+                        None
+                    } else {
+                        Some("Choose your filters and click search!".to_string())
+                    }
+                }
+            },
+        username,
+        needs_login: true,
+        title: String::from("Search - CRCD Batchmon"),
+        header: String::from("Search"),
+        jobs,
+        table_entries,
 
         state_query: params.get("state").and_then(|st| Some(st.to_owned())),
         queue_query: params.get("queue").and_then(|st| Some(st.to_owned())),

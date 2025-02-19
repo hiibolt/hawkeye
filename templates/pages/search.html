@@ -198,7 +198,7 @@
     {% if toolkit.get_field(job, "name")?.len() > 18 %}
         <td class="popover__wrapper">
             <p>
-                {{ toolkit.shorten(toolkit.get_field(job, "name")?|as_ref) }}ⓘ
+                {{ toolkit.shorten(toolkit.get_field(job, "name")?|as_ref, 18) }}ⓘ
             </p>
             <div class="popover__content">
                 <p class="popover__message">

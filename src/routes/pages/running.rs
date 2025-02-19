@@ -1,7 +1,7 @@
 use crate::routes::ClusterStatus;
 
 use super::super::AppState;
-use super::{try_render_template, TableEntry, TableStat, TableStatType, Toolkit, sort_jobs};
+use super::{try_render_template, TableEntry, TableStat, TableStatType, Toolkit, sort_build_parse};
 
 use std::collections::HashMap;
 use std::{collections::BTreeMap, sync::Arc};
@@ -84,54 +84,30 @@ pub async fn running(
             })?
     };
     
-    // Sort the jobs by any sort and reverse queries
-    sort_jobs(
-        &mut jobs,
-        params.get("sort"),
-        params.get("reverse"),
-        username.is_some()
-    );
-
     // Tweak data to be presentable and add tooltips for efficiencies
-    let table_stats = vec!(
-        TableStat::JobID,
-        TableStat::JobOwner,
-        TableStat::JobName,
-        TableStat::Status,
-        TableStat::StartTime,
-        TableStat::Queue,
-        TableStat::RsvdTime,
-        TableStat::RsvdCpus,
-        TableStat::RsvdGpus,
-        TableStat::RsvdMem,
-        TableStat::ElapsedWalltime,
-        TableStat::CpuEfficiency,
-        TableStat::MemEfficiency,
-        TableStat::More
+    let (table_entries, errors) = sort_build_parse(
+        vec!(
+            TableStat::JobID,
+            TableStat::JobOwner,
+            TableStat::JobName,
+            TableStat::Status,
+            TableStat::StartTime,
+            TableStat::Queue,
+            TableStat::RsvdTime,
+            TableStat::RsvdCpus,
+            TableStat::RsvdGpus,
+            TableStat::RsvdMem,
+            TableStat::ElapsedWalltime,
+            TableStat::CpuEfficiency,
+            TableStat::MemEfficiency,
+            TableStat::More
+        ),
+
+        &mut jobs,
+        &params,
+        username.clone()
     );
-    let mut errors = Vec::new();
-    jobs = jobs.into_iter()
-        .map(|mut job| {
-            for table_stat in table_stats.iter() {
-                if let Err(e) = table_stat.adjust_job(&mut job) {
-                    errors.push(e);
-                }
-                if let Err(e) = table_stat.ensure_needed_field(&mut job) {
-                    errors.push(e);
-                }
-            }
-
-            job
-        })
-        .rev()
-        .collect();
-    let errors = errors.iter()
-        .map(|e| e.to_string())
-        .enumerate()
-        .map(|(i, e)| format!("{}. {}", i + 1, e))
-        .collect::<Vec<String>>()
-        .join("<br>");
-
+    
     // Build template
     let template = RunningPageTemplate {
         username,
@@ -142,11 +118,9 @@ pub async fn running(
             chrono::Local::now()
                 .format("%b %e, %Y at %l:%M%p")
         ),
-        jobs: if errors.len() == 0 { jobs } else { Vec::new() },
-        alert: (!errors.is_empty()).then_some(format!("<b>There were internal errors!</b><br><br>{errors}")),
-        table_entries: table_stats.into_iter()
-            .map(|table_stat| table_stat.into() )
-            .collect(),
+        jobs,
+        alert: errors,
+        table_entries,
 
         cluster_status: app.lock().await.status,
 

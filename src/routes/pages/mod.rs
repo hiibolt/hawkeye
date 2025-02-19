@@ -16,6 +16,7 @@ enum TableStatType {
     Colored,
 
     JobName,
+    JobNameMini,
     JobOwner,
     JobID,
     ExitStatus,
@@ -26,6 +27,7 @@ enum TableStat {
     JobID,
     JobOwner,
     JobName,
+    JobNameMini,
     Status,
     StartTime,
     EndTime,
@@ -83,13 +85,14 @@ impl TableStat {
             TableStat::UsedMemPerCore => {
                 job.insert(
                     String::from("used_mem_per_cpu"),
-                    ( job.get("used_mem")
-                        .and_then(|st| st.parse::<f32>().ok())
-                        .unwrap_or(0f32) /
-                    job.get("req_cpus")
-                        .and_then(|st| st.parse::<f32>().ok())
-                        .unwrap_or(1f32) )
-                        .to_string()
+                    format!("{:.2}",
+                        ( job.get("used_mem")
+                            .and_then(|st| st.parse::<f32>().ok())
+                            .unwrap_or(0f32) /
+                        job.get("req_cpus")
+                            .and_then(|st| st.parse::<f32>().ok())
+                            .unwrap_or(1f32) )
+                    )
                 );
             }
             TableStat::NodesChunks => {
@@ -167,6 +170,14 @@ impl Into<TableEntry> for TableStat {
                 value: String::from("name"),
                 value_unit: None,
                 stat_type: TableStatType::JobName
+            },
+            TableStat::JobNameMini => TableEntry {
+                name: String::from("Job Name"),
+                tooltip: String::from("<b>Job Name</b>"),
+                sort_by: Some(String::from("name")),
+                value: String::from("name"),
+                value_unit: None,
+                stat_type: TableStatType::JobNameMini
             },
             TableStat::Status => TableEntry {
                 name: String::from("Status"),
@@ -261,7 +272,7 @@ impl Into<TableEntry> for TableStat {
                 tooltip: String::from("<b>Total elapsed walltime/Reserved walltime, in %"),
                 sort_by: Some(String::from("walltime_efficiency")),
                 value: String::from("walltime_efficiency"),
-                value_unit: None,
+                value_unit: Some(String::from("%")),
                 stat_type: TableStatType::Default
             },
             TableStat::ElapsedWalltimeColored => TableEntry {
@@ -363,9 +374,9 @@ impl Toolkit {
                 .context("Failed to parse number 2!")?;
         Ok(result)
     }
-    pub fn shorten ( &self, name_field: &&String ) -> String {
-        if name_field.len() > 18 {
-            format!("{}...", &name_field[..18])
+    pub fn shorten ( &self, name_field: &&String, len: usize ) -> String {
+        if name_field.len() > len {
+            format!("{}...", &name_field[..len])
         } else {
             (*name_field).clone()
         }

@@ -286,7 +286,7 @@ pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, 
     info!("\n[ Calculating Memory Efficiency... ]");
     let mem_efficiency = 
         convert_mem_to_f64(&entry.get("resources_used.mem")
-            .context("Missing field 'resources_used.mem'")?)
+            .unwrap_or(&String::from("0")))
             .context("Couldn't unpack memory field!")?
         /
         convert_mem_to_f64(&entry.get("Resource_List.mem")
