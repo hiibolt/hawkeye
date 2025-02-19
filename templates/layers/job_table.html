@@ -12,44 +12,6 @@
             -->
         </tr>
         <tr>
-            <th class="popover__wrapper">
-                <a href="#" id="Job ID"
-                    style="color: black;"
-                >Job ID</a>
-                <div class="popover__content" style="font-weight:normal;">
-                    <b>PBS Job ID</b>
-                </div>
-            </th>
-            <script>
-                document.getElementById("Job ID").addEventListener("click", function(event) {
-                    event.preventDefault(); // Prevent default link behavior
-        
-                    // The sort parameter you want to add
-                    const sortText = "pbs_id"; // This could be dynamic, based on your specific sorting logic
-        
-                    // Get the current URL
-                    const currentUrl = window.location.href;
-        
-                    // Create a URL object to easily manipulate the query parameters
-                    const url = new URL(currentUrl);
-        
-                    // Set the sort parameter
-                    url.searchParams.set("sort", sortText);
-        
-                    // Toggle the 'reverse' parameter: if it's already true, remove it; otherwise, set it to true
-                    if (url.searchParams.has("reverse")) {
-                        // If reverse is already set, toggle it off
-                        url.searchParams.delete("reverse");
-                    } else {
-                        // If reverse isn't set, add it
-                        url.searchParams.set("reverse", "true");
-                    }
-        
-                    // Redirect to the new URL with the updated query string
-                    window.location.href = url.toString();
-                });
-            </script>
-            {% block initial_headers %}{% endblock %}
             {% for table_entry in table_entries %}
                 <th class="popover__wrapper">
                     {% match table_entry.sort_by %}
@@ -96,25 +58,65 @@
                     </div>
                 </th>
             {% endfor %}
-            {% block ending_headers %}{% endblock %}
-            <th>More</th>
         </tr>
         {% for job in jobs %}
             <tr>
-                <td><b>{{ get_field(job, "pbs_id")? }}</b></td>
-                {% block initial_entries %}{% endblock %}
                 {% for table_entry in table_entries %}
                     {% match table_entry.stat_type %}
+                    {% when TableStatType::ExitStatus %}
+                        <td 
+                            {% if job["exit_status"] == "0" %}
+                                style="background-color: rgba(0, 255, 0, 0.5);"
+                            {% else %}
+                                style="background-color: rgba(255, 255, 0, 0.5);"
+                            {% endif %}
+                            class="popover__wrapper"
+                        >
+                            <div class="popover__content">
+                                {{ toolkit.get_field(job, "exit_status_tooltip")?|escape("none") }}
+                            </div>
+                            {{ toolkit.get_field(job, "exit_status")? }} ⓘ
+                        </td>
+                    {% when TableStatType::More %}
+                        <td>
+                            <a href="stats?id={{ toolkit.get_field(job, "pbs_id")? }}">
+                                <button class="table-button">View Detailed Stats</button>
+                            </a>
+                        </td>
+                    {% when TableStatType::JobID %}
+                        <td>
+                            <b>{{ toolkit.get_field(job, "pbs_id")? }}</b>
+                        </td>
+                    {% when TableStatType::JobOwner %}
+                        <td>
+                            <a href="completed?user={{ toolkit.get_field(job, "owner")? }}">{{ toolkit.get_field(job, "owner")? }}</a>
+                        </td>
+                    {% when TableStatType::JobName %}
+                        {% if toolkit.get_field(job, "name")?.len() > 18 %}
+                            <td class="popover__wrapper">
+                                <p>
+                                    {{ toolkit.shorten(toolkit.get_field(job, "name")?|as_ref) }}ⓘ
+                                </p>
+                                <div class="popover__content">
+                                    <p class="popover__message">
+                                        <b>Full Job Name:</b><br>
+                                        {{ toolkit.get_field(job, "name")? }}
+                                    </p>
+                                </div>
+                            </td>
+                        {% else %}
+                            <td>{{ toolkit.get_field(job, "name")? }}</td>
+                        {% endif %}
                     {% when TableStatType::Colored %}
-                        {% let eff = get_field(job, table_entry.value|as_ref)? %}
-                        {% match to_i32(eff|as_ref) %}
+                        {% let eff = toolkit.get_field(job, table_entry.value|as_ref)? %}
+                        {% match toolkit.to_i32(eff|as_ref) %}
                             {% when Ok with (eff) %}
                                 <td
                                     style="background-color: rgba({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0, 0.5);"
                                     class="popover__wrapper"
                                 >
                                     <div class="popover__content">
-                                        {{ get_field(job, (table_entry.value.clone() + "_tooltip")|as_ref)?|escape("none") }}
+                                        {{ toolkit.get_field(job, (table_entry.value.clone() + "_tooltip")|as_ref)?|escape("none") }}
                                     </div>
                                     <p style="white-space: nowrap;">{{ eff }}% ⓘ</p>
                                 </td>
@@ -122,15 +124,9 @@
                                 <td style="background-color: rgba(255, 255, 0, 0.5);">{{ eff }}%</td>
                         {% endmatch %}
                     {% when TableStatType::Default %}
-                        <td>{{ get_field(job, table_entry.value|as_ref)? }}{{ table_entry.value_unit.clone().unwrap_or(String::new()) }}</td>
+                        <td>{{ toolkit.get_field(job, table_entry.value|as_ref)? }}{{ table_entry.value_unit.clone().unwrap_or(String::new()) }}</td>
                     {% endmatch %}
                 {% endfor %}
-                {% block ending_entries %}{% endblock %}
-                <td>
-                    <a href="stats?id={{ get_field(job, "pbs_id")? }}">
-                        <button class="table-button">View Detailed Stats</button>
-                    </a>
-                </td>
             </tr>
         {% endfor %}
         </table>

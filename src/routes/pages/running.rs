@@ -1,7 +1,7 @@
 use crate::routes::ClusterStatus;
 
 use super::super::AppState;
-use super::{try_render_template, TableEntry, TableStat, TableStatType, to_i32, shorten, get_field, sort_jobs};
+use super::{try_render_template, TableEntry, TableStat, TableStatType, Toolkit, sort_jobs};
 
 use std::collections::HashMap;
 use std::{collections::BTreeMap, sync::Arc};
@@ -31,9 +31,7 @@ struct RunningPageTemplate {
 
     cluster_status: Option<ClusterStatus>,
 
-    to_i32: fn(&&String) -> Result<i32>,
-    shorten: fn(&&String) -> String,
-    get_field: fn(&BTreeMap<String, String>, &str) -> Result<String>
+    toolkit: Toolkit
 }
 #[tracing::instrument]
 pub async fn running(
@@ -96,6 +94,9 @@ pub async fn running(
 
     // Tweak data to be presentable and add tooltips for efficiencies
     let table_stats = vec!(
+        TableStat::JobID,
+        TableStat::JobOwner,
+        TableStat::JobName,
         TableStat::Status,
         TableStat::StartTime,
         TableStat::Queue,
@@ -103,9 +104,10 @@ pub async fn running(
         TableStat::RsvdCpus,
         TableStat::RsvdGpus,
         TableStat::RsvdMem,
-        TableStat::WalltimeEfficiency,
+        TableStat::ElapsedWalltime,
         TableStat::CpuEfficiency,
-        TableStat::MemEfficiency
+        TableStat::MemEfficiency,
+        TableStat::More
     );
     let mut errors = Vec::new();
     jobs = jobs.into_iter()
@@ -148,9 +150,7 @@ pub async fn running(
 
         cluster_status: app.lock().await.status,
 
-        to_i32,
-        shorten,
-        get_field
+        toolkit: Toolkit
     };
 
     try_render_template(&template)

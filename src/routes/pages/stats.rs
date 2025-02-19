@@ -1,5 +1,5 @@
 use super::super::AppState;
-use super::{try_render_template, div_two_i32s_into_f32, timestamp_field_to_date, to_i32};
+use super::{try_render_template, timestamp_field_to_date, Toolkit};
 
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -29,8 +29,7 @@ struct StatsPageTemplate {
     )>,
     jobs: Vec<BTreeMap<String, String>>,
     
-    div_two_i32s_into_f32: fn(&&String, &&String) -> Result<f32>,
-    to_i32: fn(&&String) -> Result<i32>
+    toolkit: Toolkit
 }
 #[tracing::instrument]
 pub async fn stats(
@@ -115,8 +114,7 @@ pub async fn stats(
         job,
         jobs: vec!(),
 
-        div_two_i32s_into_f32,
-        to_i32
+        toolkit:Toolkit
     };
 
     try_render_template(&template)

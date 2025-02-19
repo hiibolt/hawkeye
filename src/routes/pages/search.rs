@@ -1,5 +1,5 @@
 use super::super::AppState;
-use super::{try_render_template, TableEntry, TableStat, TableStatType, to_i32, get_field, timestamp_field_to_date, shorten, sort_jobs, add_efficiency_tooltips, add_exit_status_tooltip};
+use super::{try_render_template, TableEntry, TableStat, TableStatType, Toolkit, sort_jobs, add_efficiency_tooltips, add_exit_status_tooltip, timestamp_field_to_date};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -32,9 +32,7 @@ struct SearchPageTemplate {
     name_query: Option<String>,
     date_query: Option<String>,
 
-    to_i32: fn(&&String) -> Result<i32>,
-    shorten: fn(&&String) -> String,
-    get_field: fn(&BTreeMap<String, String>, &str) -> Result<String>
+    toolkit: Toolkit
 }
 #[tracing::instrument]
 pub async fn search(
@@ -171,7 +169,7 @@ pub async fn search(
             TableStat::RsvdCpus,
             TableStat::RsvdGpus,
             TableStat::RsvdMem,
-            TableStat::WalltimeEfficiency,
+            TableStat::ElapsedWalltimeColored,
             TableStat::CpuEfficiency,
             TableStat::MemEfficiency,
         ].into_iter()
@@ -184,9 +182,7 @@ pub async fn search(
         name_query: params.get("name").and_then(|st| Some(st.to_owned())),
         date_query,
 
-        to_i32,
-        shorten,
-        get_field
+        toolkit:Toolkit
     };
 
     try_render_template(&template)

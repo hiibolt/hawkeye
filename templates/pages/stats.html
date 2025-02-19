@@ -76,13 +76,13 @@
                         <td>{{ job["chunks"] }}</td>
                         <td>{{ job["used_cpu_percent"] }}%</td>
                         <td>{{ job["used_mem"] }}GB</td>
-                        {% match div_two_i32s_into_f32(job["used_mem"], job["req_cpus"]) %}
+                        {% match toolkit.div_two_i32s_into_f32(job["used_mem"], job["req_cpus"]) %}
                         {% when Ok with (used_mem_per_cpu) %}
                             <td>{{ used_mem_per_cpu }}GB</td>
                         {% when Err with (_) %}
                             <td>NaN</td>
                         {% endmatch %}
-                        {% match div_two_i32s_into_f32(job["used_mem"], job["req_mem"]) %}
+                        {% match toolkit.div_two_i32s_into_f32(job["used_mem"], job["req_mem"]) %}
                         {% when Ok with (used_mem_per_req) %}
                             <td>{{ used_mem_per_req }}</td>
                         {% when Err with (_) %}
@@ -105,7 +105,7 @@
                 </p>
             </div>
             <div>
-                {% match to_i32(job["cpu_efficiency"]) %}
+                {% match toolkit.to_i32(job["cpu_efficiency"]) %}
                     {% when Ok with (eff) %}
                         {% let width_eff = 5+eff %}
                         {% if width_eff > 100 %}
@@ -124,7 +124,7 @@
                         </div>
                     {% when Err with (_) %}
                 {% endmatch %}
-                {% match to_i32(job["mem_efficiency"]) %}
+                {% match toolkit.to_i32(job["mem_efficiency"]) %}
                     {% when Ok with (eff) %}
                         {% let width_eff = 5+eff %}
                         {% if width_eff > 100 %}
@@ -143,7 +143,7 @@
                         </div>
                     {% when Err with (_) %}
                 {% endmatch %}
-                {% match to_i32(job["walltime_efficiency"]) %}
+                {% match toolkit.to_i32(job["walltime_efficiency"]) %}
                     {% when Ok with (eff) %}
                         {% let width_eff = 5+eff %}
                         {% if width_eff > 100 %}

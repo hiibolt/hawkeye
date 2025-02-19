@@ -1,5 +1,5 @@
 use super::super::AppState;
-use super::{try_render_template, sort_jobs, to_i32, get_field, TableEntry, TableStat, TableStatType, add_exit_status_tooltip};
+use super::{sort_build_parse, try_render_template, Toolkit, TableEntry, TableStat, TableStatType};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -11,7 +11,7 @@ use axum::{
 use tower_sessions::Session;
 use axum::http::StatusCode;
 use askama::Template;
-use tracing::{info, error};
+use tracing::{error, info};
 
 
 
@@ -29,8 +29,7 @@ struct CompletedPageTemplate {
     user_query: Option<String>,
     date_query: Option<String>,
 
-    to_i32: fn(&&String) -> Result<i32>,
-    get_field: fn(&BTreeMap<String, String>, &str) -> Result<String>
+    toolkit: Toolkit
 }
 #[tracing::instrument]
 pub async fn completed(
@@ -92,97 +91,56 @@ pub async fn completed(
         vec!()
     };
 
-    // Insert the number of required nodes
-    jobs = jobs.into_iter()
-        .map(|mut job| {
-            job.insert(
-                String::from("req_nodes"),
-                job["nodes"].split(',').collect::<Vec<&str>>().len().to_string()
-            );
-
-            job
-        })
-        .rev()
-        .collect();
-
-    // Sort the jobs by any sort and reverse queries
-    sort_jobs(
-        &mut jobs,
-        params.get("sort"),
-        params.get("reverse"),
-        username.is_some()
-    );
-
     // Tweak data to be presentable and add tooltips for efficiencies
-    let table_stats = vec!(
-        TableStat::RsvdCpus,
-        TableStat::NodesChunks,
-        TableStat::RsvdMem,
-        TableStat::EndTime,
-        TableStat::UsedMemPerCore,
-        TableStat::UsedMem,
-        TableStat::CpuTime,
-        TableStat::WalltimeEfficiency,
-        TableStat::CpuEfficiency,
-        TableStat::MemEfficiency
+    let (table_entries, errors) = sort_build_parse(
+        vec!(
+            TableStat::JobID,
+            TableStat::JobOwner,
+            TableStat::RsvdCpus,
+            TableStat::NodesChunks,
+            TableStat::RsvdMem,
+            TableStat::EndTime,
+            TableStat::UsedMemPerCore,
+            TableStat::UsedMem,
+            TableStat::CpuTime,
+            TableStat::ElapsedWalltimeColored,
+            TableStat::CpuEfficiency,
+            TableStat::MemEfficiency,
+            TableStat::ExitStatus,
+            TableStat::More
+        ),
+
+        &mut jobs,
+        &params,
+        username.clone()
     );
-    let mut errors = Vec::new();
-    jobs = jobs.into_iter()
-        .map(|mut job| {
-            // Add tooltip for exit status
-            add_exit_status_tooltip(&mut job);
 
-            for table_stat in table_stats.iter() {
-                if let Err(e) = table_stat.adjust_job(&mut job) {
-                    errors.push(e);
-                }
-                if let Err(e) = table_stat.ensure_needed_field(&mut job) {
-                    errors.push(e);
-                }
-            }
-
-            job
-        })
-        .collect();
-    let errors = errors.iter()
-        .map(|e| e.to_string())
-        .enumerate()
-        .map(|(i, e)| format!("{}. {}", i + 1, e))
-        .collect::<Vec<String>>()
-        .join("\n");
-
-    // Build the header and template
-    let header = if let Some(ref user_query) = user_query {
-        format!(
-            "Completed Jobs for '{}' on Metis ({})",
-            user_query,
-            date_query.clone().unwrap_or("month".to_string())
-        )
-    } else {
-        String::from("Completed Jobs on Metis")
-    };
+    // Build the template
     let template = CompletedPageTemplate {
-        // Cool compiler magic here :3c (avoids cloning) [twice now!]
-        jobs: if !errors.is_empty() { vec!() } else { jobs },
-        alert: if username.is_none() { 
-            Some("You are not logged in!".to_string())
-        } else {
-            (!errors.is_empty()).then_some(format!("<b>There were internal errors!</b><br><br>{errors}"))
-        },
+        jobs,
+        alert: username
+            .clone()
+            .and(errors)
+            .or(Some("You are not logged in!".to_string())),
         username,
         needs_login: true,
         title: String::from("Completed Jobs - CRCD Batchmon"),
-        header,
+        header: if let Some(ref user_query) = user_query {
+            format!(
+                "Completed Jobs for '{}' on Metis ({})",
+                user_query,
+                date_query.clone().unwrap_or("month".to_string())
+            )
+        } else {
+            String::from("Completed Jobs on Metis")
+        },
 
-        table_entries: table_stats.into_iter()
-            .map(|table_stat| table_stat.into() )
-            .collect(),
+        table_entries,
 
         user_query,
         date_query,
 
-        to_i32,
-        get_field
+        toolkit:Toolkit
     };
 
     try_render_template(&template)

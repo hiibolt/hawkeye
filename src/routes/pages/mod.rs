@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use axum::{http::{self, StatusCode}, response::Response};
 use tracing::{error, info};
 use anyhow::{Context, Result};
@@ -12,10 +12,20 @@ pub mod stats;
 #[derive(Clone, Debug)]
 enum TableStatType {
     Default,
-    Colored
+
+    Colored,
+
+    JobName,
+    JobOwner,
+    JobID,
+    ExitStatus,
+    More
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum TableStat {
+    JobID,
+    JobOwner,
+    JobName,
     Status,
     StartTime,
     EndTime,
@@ -27,10 +37,13 @@ enum TableStat {
     RsvdCpus,
     RsvdGpus,
     RsvdMem,
-    WalltimeEfficiency,
+    ElapsedWalltime,
+    ElapsedWalltimeColored,
     CpuEfficiency,
     MemEfficiency,
     NodesChunks,
+    ExitStatus,
+    More,
     #[allow(dead_code)]
     Custom {
         name: String,
@@ -97,14 +110,14 @@ impl TableStat {
             TableStat::CpuEfficiency | TableStat::MemEfficiency => {
                 add_efficiency_tooltips(job);
             },
-            TableStat::WalltimeEfficiency => {
+            TableStat::ElapsedWalltime | TableStat::ElapsedWalltimeColored => {
                 add_efficiency_tooltips(job);
 
                 let walltime_efficiency_ref = job.get_mut("walltime_efficiency")
                     .context("Failed to get walltime efficiency!")?;
 
                 if let Ok(walltime_efficiency) = walltime_efficiency_ref.parse::<f32>() {
-                    *walltime_efficiency_ref = format!("{}%", walltime_efficiency.ceil());
+                    *walltime_efficiency_ref = format!("{}", walltime_efficiency.ceil());
                 }
             },
             TableStat::Custom { .. } => {
@@ -131,6 +144,30 @@ impl TableStat {
 impl Into<TableEntry> for TableStat {
     fn into ( self ) -> TableEntry {
         match self {
+            TableStat::JobID => TableEntry {
+                name: String::from("Job ID"),
+                tooltip: String::from("<b>PBS Job ID</b>"),
+                sort_by: Some(String::from("pbs_id")),
+                value: String::from("pbs_id"),
+                value_unit: None,
+                stat_type: TableStatType::JobID
+            },
+            TableStat::JobOwner => TableEntry {
+                name: String::from("Job Owner"),
+                tooltip: String::from("<b>The UNIX Username of the Job Owner</b>"),
+                sort_by: Some(String::from("owner")),
+                value: String::from("owner"),
+                value_unit: None,
+                stat_type: TableStatType::JobOwner
+            },
+            TableStat::JobName => TableEntry {
+                name: String::from("Job Name"),
+                tooltip: String::from("<b>Job Name</b>"),
+                sort_by: Some(String::from("name")),
+                value: String::from("name"),
+                value_unit: None,
+                stat_type: TableStatType::JobName
+            },
             TableStat::Status => TableEntry {
                 name: String::from("Status"),
                 tooltip: String::from("<b>PBS Job State</b>"),
@@ -166,7 +203,7 @@ impl Into<TableEntry> for TableStat {
             TableStat::UsedMemPerCore => TableEntry {
                 name: String::from("Mem/Core"),
                 tooltip: String::from("<b>Memory per Core</b><br><br>The amount of memory used per CPU core, in GB"),
-                sort_by: Some(String::from("used_mem_per_cpu")),
+                sort_by: None,
                 value: String::from("used_mem_per_cpu"),
                 value_unit: Some(String::from("GB")),
                 stat_type: TableStatType::Default
@@ -219,13 +256,21 @@ impl Into<TableEntry> for TableStat {
                 value_unit: Some(String::from("GB")),
                 stat_type: TableStatType::Default
             },
-            TableStat::WalltimeEfficiency => TableEntry {
+            TableStat::ElapsedWalltime => TableEntry {
                 name: String::from("Elapsed Walltime"),
                 tooltip: String::from("<b>Total elapsed walltime/Reserved walltime, in %"),
                 sort_by: Some(String::from("walltime_efficiency")),
                 value: String::from("walltime_efficiency"),
                 value_unit: None,
                 stat_type: TableStatType::Default
+            },
+            TableStat::ElapsedWalltimeColored => TableEntry {
+                name: String::from("Elapsed Walltime"),
+                tooltip: String::from("<b>Total elapsed walltime/Reserved walltime, in %"),
+                sort_by: Some(String::from("walltime_efficiency")),
+                value: String::from("walltime_efficiency"),
+                value_unit: None,
+                stat_type: TableStatType::Colored
             },
             TableStat::CpuEfficiency => TableEntry {
                 name: String::from("CPU Usage"),
@@ -250,6 +295,22 @@ impl Into<TableEntry> for TableStat {
                 value: String::from("nodes/chunks"),
                 value_unit: None,
                 stat_type: TableStatType::Default
+            },
+            TableStat::ExitStatus => TableEntry {
+                name: String::from("Exit Status"),
+                tooltip: String::from("<b>Exit Status</b><br><br>The exit status of the job"),
+                sort_by: Some(String::from("exit_status")),
+                value: String::from("exit_status"),
+                value_unit: None,
+                stat_type: TableStatType::ExitStatus
+            },
+            TableStat::More => TableEntry {
+                name: String::from("More"),
+                tooltip: String::from("<b>More Information</b>"),
+                sort_by: None,
+                value: String::from("pbs_id"),
+                value_unit: None,
+                stat_type: TableStatType::More
             },
             TableStat::Custom { name, tooltip, sort_by, value, value_unit, stat_type } => TableEntry {
                 name,
@@ -286,30 +347,34 @@ fn timestamp_field_to_date ( timestamp_field: &mut String ) {
 }
 
 // Askama helper functions
-fn to_i32 ( num: &&String ) -> Result<i32> {
-    Ok(num.parse::<f64>()
-        .context("Failed to parse number!")?
-        .ceil()
-        as i32)
-}
-fn div_two_i32s_into_f32 ( num1: &&String, num2: &&String ) -> Result<f32> {
-    let result = num1.parse::<f32>()
-        .context("Failed to parse number 1!")?
-        / num2.parse::<f32>()
-            .context("Failed to parse number 2!")?;
-    Ok(result)
-}
-fn shorten ( name_field: &&String ) -> String {
-    if name_field.len() > 18 {
-        format!("{}...", &name_field[..18])
-    } else {
-        (*name_field).clone()
+#[derive(Debug)]
+struct Toolkit;
+impl Toolkit {
+    pub fn to_i32 ( &self, num: &&String ) -> Result<i32> {
+        Ok(num.parse::<f64>()
+            .context("Failed to parse number!")?
+            .ceil()
+            as i32)
     }
-}
-fn get_field ( job: &BTreeMap<String, String>, field: &str ) -> Result<String> {
-    job.get(field)
-        .ok_or_else(|| anyhow::anyhow!("Field '{}' not found in job!", field))
-        .map(|st| st.to_string())
+    pub fn div_two_i32s_into_f32 ( &self, num1: &&String, num2: &&String ) -> Result<f32> {
+        let result = num1.parse::<f32>()
+            .context("Failed to parse number 1!")?
+            / num2.parse::<f32>()
+                .context("Failed to parse number 2!")?;
+        Ok(result)
+    }
+    pub fn shorten ( &self, name_field: &&String ) -> String {
+        if name_field.len() > 18 {
+            format!("{}...", &name_field[..18])
+        } else {
+            (*name_field).clone()
+        }
+    }
+    pub fn get_field ( &self, job: &BTreeMap<String, String>, field: &str ) -> Result<String> {
+        job.get(field)
+            .ok_or_else(|| anyhow::anyhow!("Field '{}' not found in job!", field))
+            .map(|st| st.to_string())
+    }
 }
 
 #[tracing::instrument]
@@ -525,3 +590,60 @@ fn try_render_template <T: ?Sized + askama::Template> (
             (StatusCode::INTERNAL_SERVER_ERROR, "Failed to build response!".to_string())
         })
 }
+#[tracing::instrument]
+    fn sort_build_parse (
+        table_stats: Vec<TableStat>,
+
+        jobs: &mut Vec<BTreeMap<String, String>>,
+        params: &HashMap<String, String>,
+        username: Option<String>
+    ) -> (
+        Vec<TableEntry>, // Table entries
+        Option<String>,  // Error string
+    ) {
+        // Sort the jobs by any sort and reverse queries
+        sort_jobs(
+            jobs,
+            params.get("sort"),
+            params.get("reverse"),
+            username.is_some()
+        );
+
+        // Tweak data to be presentable and add tooltips for efficiencies
+        let mut errors = Vec::new();
+        for job_ref in jobs.iter_mut() {
+            // Add tooltip for exit status
+            add_exit_status_tooltip(job_ref);
+
+            for table_stat in table_stats.iter() {
+                if let Err(e) = table_stat.adjust_job(job_ref) {
+                    errors.push(e);
+                }
+                if let Err(e) = table_stat.ensure_needed_field(job_ref) {
+                    errors.push(e);
+                }
+            }
+        }
+        let errors = errors
+            .iter()
+            .map(|e| e.to_string())
+            .enumerate()
+            .map(|(i, e)| format!("{}. {}", i + 1, e))
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        // If there are errors, wipe the jobs
+        if !errors.is_empty() {
+            jobs.clear();
+
+            // Print the errors if there are any
+            error!(%errors, "Errors while parsing jobs!");
+        }
+
+        (
+            table_stats.into_iter()
+                .map(|table_stat| table_stat.into() )
+                .collect(),
+            (!errors.trim().is_empty()).then_some(errors)
+        )
+    }
