@@ -28,6 +28,7 @@ struct StatsPageTemplate {
         Vec<BTreeMap<String, String>>
     )>,
     jobs: Vec<BTreeMap<String, String>>,
+    url_prefix: String,
     
     toolkit: Toolkit
 }
@@ -113,6 +114,7 @@ pub async fn stats(
 
         job,
         jobs: vec!(),
+        url_prefix: app.lock().await.url_prefix.clone(),
 
         toolkit:Toolkit
     };

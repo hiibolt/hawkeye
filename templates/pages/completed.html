@@ -10,7 +10,7 @@
     {% match username %}
         {% when None %}
             <div class="nav-item">
-                <p>You cannot view this data, please <a href="login">log in</a> to view it.</p>
+                <p>You cannot view this data, please <a href="{{ url_prefix }}/login">log in</a> to view it.</p>
             </div>
         {% when Some with (username) %}
             <div class="filter-container">
@@ -71,7 +71,7 @@
         search_button.addEventListener('click', () => {
             const user = user_input.value;
             const date = date_dropdown.value;
-            window.location.href = `completed?user=${user}&date=${date}`;
+            window.location.href = `{{ url_prefix }}/completed?user=${user}&date=${date}`;
         });
     </script>
 {% endblock %}

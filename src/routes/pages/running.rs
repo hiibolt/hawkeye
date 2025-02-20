@@ -30,6 +30,7 @@ struct RunningPageTemplate {
     table_entries: Vec<TableEntry>,
 
     cluster_status: Option<ClusterStatus>,
+    url_prefix: String,
 
     toolkit: Toolkit
 }
@@ -128,6 +129,7 @@ pub async fn running(
         table_entries,
 
         cluster_status: app.lock().await.status,
+        url_prefix: app.lock().await.url_prefix.clone(),
 
         toolkit: Toolkit
     };

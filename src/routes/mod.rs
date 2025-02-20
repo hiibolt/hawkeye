@@ -24,6 +24,7 @@ pub struct AppState {
     pub remote_username: String,
     pub remote_hostname: String,
     pub db: super::DB,
+    pub url_prefix: String,
 
     pub status: Option<ClusterStatus>
 }

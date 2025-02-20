@@ -79,7 +79,7 @@
                         </td>
                     {% when TableStatType::More %}
                         <td>
-                            <a href="stats?id={{ toolkit.get_field(job, "pbs_id")? }}">
+                            <a href="{{ url_prefix }}/stats?id={{ toolkit.get_field(job, "pbs_id")? }}">
                                 <button class="table-button">View Detailed Stats</button>
                             </a>
                         </td>
@@ -89,7 +89,7 @@
                         </td>
                     {% when TableStatType::JobOwner %}
                         <td>
-                            <a href="completed?user={{ toolkit.get_field(job, "owner")? }}">{{ toolkit.get_field(job, "owner")? }}</a>
+                            <a href="{{ url_prefix }}/completed?user={{ toolkit.get_field(job, "owner")? }}">{{ toolkit.get_field(job, "owner")? }}</a>
                         </td>
                     {% when TableStatType::JobName with (len) %}
                         {% if toolkit.get_field(job, "name")?.len()|as_ref > len %}

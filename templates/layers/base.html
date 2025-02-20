@@ -121,7 +121,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- Favicon -->
-    <link rel="icon" href="public/images/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="{{ url_prefix }}/public/images/favicon.ico" type="image/x-icon">
     <!-- Above Favicon Created and Licensed by https://thenounproject.com/creator/heztasia/ -->
 </head>
 <body>
@@ -131,13 +131,13 @@
             <h1>Batch Job Monitor</h1>
         </div>
         <div class="auth">
-            <a href="running">
+            <a href="{{ url_prefix }}/running">
                 <button class="header-button"><b>Metis Overview</b></button>
             </a>
-            <a href="completed">
+            <a href="{{ url_prefix }}/completed">
                 <button class="header-button"><b>Completed Jobs</b></button>
             </a>
-            <a href="search">
+            <a href="{{ url_prefix }}/search">
                 <button class="header-button"><b>Search</b></button>
             </a>
             {% match username %}
@@ -149,11 +149,11 @@
                         signout_button.addEventListener('click', () => {
                             // Send a post request (with credentials) to `api/v1/auth/logout`,
                             //  then redirect to the root page.
-                            fetch('api/v1/auth/logout', {
+                            fetch('{{ url_prefix }}api/v1/auth/logout', {
                                 method: 'POST',
                                 credentials: 'include'
                             }).then(() => {
-                                window.location.href = '/login';
+                                window.location.href = '{{ url_prefix }}/login';
                             });
                         });
                     </script>
@@ -161,7 +161,7 @@
                     <a href="https://www.niu.edu/crcd/prospective-user/access.shtml">
                         <button class="signin-button"><b>Register</b></button>
                     </a>
-                    <a href="login">
+                    <a href="{{ url_prefix }}/login">
                         <button class="signin-button"><b>Sign In</b></button>
                     </a>
             {% endmatch %}

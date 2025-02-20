@@ -32,7 +32,7 @@ async fn main() -> ! {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    // Create the shared state
+        // Create the shared state
     let state: Arc<Mutex<AppState>> = Arc::new(Mutex::new(AppState {
         remote_username: std::env::var("REMOTE_USERNAME")
             .expect("Missing `REMOTE_USERNAME` environment variable!"),
@@ -42,6 +42,8 @@ async fn main() -> ! {
             &std::env::var("DB_PATH")
                 .expect("Missing `DB_PATH` environment variable!")
         ).expect("Failed to establish connection to DB!"),
+        url_prefix: std::env::var("URL_PREFIX")
+            .unwrap_or(String::new()),
 
         status: None
     }));

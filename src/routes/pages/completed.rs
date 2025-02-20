@@ -28,6 +28,7 @@ struct CompletedPageTemplate {
 
     user_query: Option<String>,
     date_query: Option<String>,
+    url_prefix: String,
 
     toolkit: Toolkit
 }
@@ -144,6 +145,7 @@ pub async fn completed(
 
         user_query,
         date_query,
+        url_prefix: app.lock().await.url_prefix.clone(),
 
         toolkit:Toolkit
     };

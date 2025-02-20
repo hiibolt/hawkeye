@@ -10,7 +10,7 @@
     {% match username %}
         {% when None %}
             <div class="nav-item">
-                <p>You cannot view this data, please <a href="login">log in</a> to view it.</p>
+                <p>You cannot view this data, please <a href="{{ url_prefix }}/login">log in</a> to view it.</p>
             </div>
         {% when Some with (username) %}
             <div class="filter-container">
@@ -94,7 +94,7 @@
                     const state = state_input.value;
                     const name = name_input.value;
                     const date = date_dropdown.value;
-                    let url = `search?`;
+                    let url = `{{ url_prefix }}/search?`;
 
                     if (user) {
                         url += `user=${user}&`;
@@ -194,7 +194,7 @@
     </script>
 {% endblock %}
 {% block initial_entries %}
-    <td><a href="completed?user={{ toolkit.get_field(job, "owner")? }}">{{ toolkit.get_field(job, "owner")? }}</a></td>
+    <td><a href="{{ url_prefix }}/completed?user={{ toolkit.get_field(job, "owner")? }}">{{ toolkit.get_field(job, "owner")? }}</a></td>
     {% if toolkit.get_field(job, "name")?.len() > 18 %}
         <td class="popover__wrapper">
             <p>

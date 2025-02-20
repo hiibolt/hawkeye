@@ -31,6 +31,7 @@ struct SearchPageTemplate {
     user_query: Option<String>,
     name_query: Option<String>,
     date_query: Option<String>,
+    url_prefix: String,
 
     toolkit: Toolkit
 }
@@ -163,6 +164,7 @@ pub async fn search(
         user_query: params.get("user").and_then(|st| Some(st.to_owned())),
         name_query: params.get("name").and_then(|st| Some(st.to_owned())),
         date_query,
+        url_prefix: app.lock().await.url_prefix.clone(),
 
         toolkit:Toolkit
     };

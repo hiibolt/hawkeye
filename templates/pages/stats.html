@@ -10,7 +10,7 @@
     {% match username %}
         {% when None %}
             <div class="nav-item">
-                <p>You cannot view this data, please <a href="login">log in</a> to view it.</p>
+                <p>You cannot view this data, please <a href="{{ url_prefix }}/login">log in</a> to view it.</p>
             </div>
         {% when Some with (username) %}
     {% endmatch %}
@@ -28,7 +28,7 @@
                 <p>
                     <b>{{ job["name"] }} - {{ job["pbs_id"] }} ({% if job["state"] == "E" %}{{ job["state"] }} - Exit Status: '{{ job["exit_status"] }}'{% else %}{{ job["state"] }}{% endif %})</b>
                     <br>
-                    Submitted by <a href="completed?user={{ job["owner"] }}">{{ job["owner"] }}</a>{% if job["start_time"] != "2147483647" %} on <b>{{ job["start_time"] }}</b>{% endif %}
+                    Submitted by <a href="{{ url_prefix }}/completed?user={{ job["owner"] }}">{{ job["owner"] }}</a>{% if job["start_time"] != "2147483647" %} on <b>{{ job["start_time"] }}</b>{% endif %}
                 </p>
             </div>
             <table class="job-table">
