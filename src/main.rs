@@ -79,8 +79,8 @@ async fn main() -> ! {
 
     // Nest the API into the general app router
     let app = Router::new()
-        .nest("/api/v1", api_v1)
-        .route("/", get(routes::pages::running::running))
+        .nest(&(url_prefix.clone() + "/api/v1"), api_v1)
+        .route(&(url_prefix.clone() + "/"), get(routes::pages::running::running))
         .route(&(url_prefix.clone() + "/login"), get(routes::pages::login::login))
         .route(&(url_prefix.clone() + "/stats"), get(routes::pages::stats::stats))
         .route(&(url_prefix.clone() + "/running"), get(routes::pages::running::running))
