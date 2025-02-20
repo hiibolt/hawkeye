@@ -32,7 +32,9 @@ async fn main() -> ! {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-        // Create the shared state
+    // Create the shared state
+    let url_prefix = std::env::var("URL_PREFIX")
+        .unwrap_or(String::new());
     let state: Arc<Mutex<AppState>> = Arc::new(Mutex::new(AppState {
         remote_username: std::env::var("REMOTE_USERNAME")
             .expect("Missing `REMOTE_USERNAME` environment variable!"),
@@ -42,8 +44,7 @@ async fn main() -> ! {
             &std::env::var("DB_PATH")
                 .expect("Missing `DB_PATH` environment variable!")
         ).expect("Failed to establish connection to DB!"),
-        url_prefix: std::env::var("URL_PREFIX")
-            .unwrap_or(String::new()),
+        url_prefix: url_prefix.clone(),
 
         status: None
     }));
@@ -80,12 +81,12 @@ async fn main() -> ! {
     let app = Router::new()
         .nest("/api/v1", api_v1)
         .route("/", get(routes::pages::running::running))
-        .route("/login", get(routes::pages::login::login))
-        .route("/stats", get(routes::pages::stats::stats))
-        .route("/running", get(routes::pages::running::running))
-        .route("/completed", get(routes::pages::completed::completed))
-        .route("/search", get(routes::pages::search::search))
-        .route("/public/images/favicon.ico", get(routes::get_favicon))
+        .route(&(url_prefix.clone() + "/login"), get(routes::pages::login::login))
+        .route(&(url_prefix.clone() + "/stats"), get(routes::pages::stats::stats))
+        .route(&(url_prefix.clone() + "/running"), get(routes::pages::running::running))
+        .route(&(url_prefix.clone() + "/completed"), get(routes::pages::completed::completed))
+        .route(&(url_prefix.clone() + "/search"), get(routes::pages::search::search))
+        .route(&(url_prefix + "/public/images/favicon.ico"), get(routes::get_favicon))
         .layer(session_layer)
         .with_state(state.clone());
 
