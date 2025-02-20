@@ -55,6 +55,8 @@ pub async fn login (
         
         tasks.join_all().await;
     }
+
+    let url_prefix = app.lock().await.url_prefix.clone();
     
     match login_result.success {
         true => {
@@ -71,7 +73,7 @@ pub async fn login (
 
             drop(login_result);
 
-            Ok(Redirect::to("/"))
+            Ok(Redirect::to(&(url_prefix + "/")))
         },
         false => {
             drop(login_result);
@@ -79,7 +81,7 @@ pub async fn login (
             // If not verified or an error, you can respond with an error page/JSON
             // Here we'll just return a plain text error
             warn!("[ Invalid login! ]");
-            Ok(Redirect::to("/login?invalid=true"))
+            Ok(Redirect::to(&(url_prefix + "/login?invalid=true")))
         }
     }
 }
