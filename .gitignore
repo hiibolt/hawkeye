@@ -6,3 +6,4 @@
 *.AppImage
 result
 *.tar.gz
+start.sh
