@@ -34,11 +34,10 @@ pub async fn grab_group_thread (
         .collect();
     info!("Got groups for `{user}`: {groups:?}");
 
-    let db = &mut app.lock().await.db;
-    for group in groups {
-        db.insert_user_group(&user, group)
-            .with_context(|| format!("Couldn't insert user {user} into group {group}!"))?;
-    }
+    app.lock().await
+        .db
+        .insert_user_groups(&user, groups)
+        .context("Couldn't insert user groups!")?;
     
     info!("Inserted groups for `{user}`!");
 

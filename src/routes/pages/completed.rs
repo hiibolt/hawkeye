@@ -92,7 +92,11 @@ pub async fn completed(
     };
 
     // Tweak data to be presentable and add tooltips for efficiencies
+    let groups_cache = app.lock().await
+        .db
+        .get_groups_cache();
     let (table_entries, errors) = sort_build_parse(
+        groups_cache,
         vec!(
             TableStat::JobID,
             TableStat::JobOwner,
@@ -118,10 +122,11 @@ pub async fn completed(
     // Build the template
     let template = CompletedPageTemplate {
         jobs,
-        alert: username
-            .clone()
-            .and(errors)
-            .or(Some("You are not logged in!".to_string())),
+        alert: if username.is_some() {
+                errors
+            } else {
+                Some("You are not logged in!".to_string())
+            },
         username,
         needs_login: true,
         title: String::from("Completed Jobs - CRCD Batchmon"),

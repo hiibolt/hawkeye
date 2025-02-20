@@ -75,3 +75,31 @@
         });
     </script>
 {% endblock %}
+
+{% block pre_jobs %}
+{% if needs_login == false || (username.is_some() && jobs.len() > 0) %}
+{% let total_jobs = jobs.len() %}
+{% let successful_jobs = toolkit.total_successful_jobs(jobs) %}
+<div class="completed-table-container">
+    <table class="job-table">
+        <tr>
+            <th>Total Jobs</th>
+            <th>Successful Jobs</th>
+            <th>Total CPU Time</th>
+        </tr>
+        <tr>
+            <td>{{ total_jobs }}</td>
+            <td>
+                {{ successful_jobs }}
+                {% match toolkit.div_two_i32s_into_f32(successful_jobs.to_string()|as_ref|as_ref, total_jobs.to_string()|as_ref|as_ref) %}
+                {% when Ok with (percent_successful_jobs) %}
+                 ({{ format!("{:.2}", percent_successful_jobs * 100f32) }}%)
+                {% when Err with (_) %}
+            {% endmatch %}
+            </td>
+            <td>{{ toolkit.total_cpu_time(jobs) }}</td>
+            
+    </table>
+</div>
+{% endif %}
+{% endblock %}

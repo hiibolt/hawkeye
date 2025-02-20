@@ -91,11 +91,11 @@
                         <td>
                             <a href="completed?user={{ toolkit.get_field(job, "owner")? }}">{{ toolkit.get_field(job, "owner")? }}</a>
                         </td>
-                    {% when TableStatType::JobName %}
-                        {% if toolkit.get_field(job, "name")?.len() > 18 %}
+                    {% when TableStatType::JobName with (len) %}
+                        {% if toolkit.get_field(job, "name")?.len()|as_ref > len %}
                             <td class="popover__wrapper">
                                 <p>
-                                    {{ toolkit.shorten(toolkit.get_field(job, "name")?|as_ref, 18) }}ⓘ
+                                    {{ toolkit.shorten(toolkit.get_field(job, "name")?|as_ref, len) }}ⓘ
                                 </p>
                                 <div class="popover__content">
                                     <p class="popover__message">
@@ -107,21 +107,21 @@
                         {% else %}
                             <td>{{ toolkit.get_field(job, "name")? }}</td>
                         {% endif %}
-                    {% when TableStatType::JobNameMini %}
-                        {% if toolkit.get_field(job, "name")?.len() > 18 %}
+                    {% when TableStatType::JobGroups with (len) %}
+                        {% if toolkit.get_field(job, "groups")?.len()|as_ref > len %}
                             <td class="popover__wrapper">
                                 <p>
-                                    {{ toolkit.shorten(toolkit.get_field(job, "name")?|as_ref, 10) }}ⓘ
+                                    {{ toolkit.shorten(toolkit.get_field(job, "groups")?|as_ref, len) }}ⓘ
                                 </p>
                                 <div class="popover__content">
                                     <p class="popover__message">
-                                        <b>Full Job Name:</b><br>
-                                        {{ toolkit.get_field(job, "name")? }}
+                                        <b>All Groups:</b><br>
+                                        {{ toolkit.get_field(job, "groups")? }}
                                     </p>
                                 </div>
                             </td>
                         {% else %}
-                            <td>{{ toolkit.get_field(job, "name")? }}</td>
+                            <td>{{ toolkit.get_field(job, "groups")? }}</td>
                         {% endif %}
                     {% when TableStatType::Colored %}
                         {% let eff = toolkit.get_field(job, table_entry.value|as_ref)? %}

@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use axum::{http::{self, StatusCode}, response::Response};
 use tracing::{error, info};
 use anyhow::{Context, Result};
@@ -15,10 +15,10 @@ enum TableStatType {
 
     Colored,
 
-    JobName,
-    JobNameMini,
-    JobOwner,
     JobID,
+    JobName(usize),
+    JobGroups(usize),
+    JobOwner,
     ExitStatus,
     More
 }
@@ -26,8 +26,8 @@ enum TableStatType {
 enum TableStat {
     JobID,
     JobOwner,
-    JobName,
-    JobNameMini,
+    JobName(usize),
+    JobGroups(usize),
     Status,
     StartTime,
     EndTime,
@@ -59,9 +59,33 @@ enum TableStat {
 impl TableStat {
     fn adjust_job (
         &self,
+        group_cache: &HashMap<String, HashSet<String>>,
         job: &mut BTreeMap<String, String>
     ) -> Result<()> {
         match self {
+            TableStat::JobGroups(_) => {
+                let owner = job.get("owner")
+                    .context("Missing `owner` field!")?;
+
+                if owner == "REDACTED" {
+                    job.insert(
+                        String::from("groups"),
+                        String::from("REDACTED")
+                    );
+                    
+                    return Ok(());
+                }
+
+                job.insert(
+                    String::from("groups"),
+                    group_cache.get(owner)
+                        .unwrap_or(&HashSet::from([String::from("None")]))
+                        .into_iter()
+                        .map(|st| st.to_owned())
+                        .collect::<Vec<String>>()
+                        .join(",")
+                );
+            }
             TableStat::StartTime => {
                 let start_time_str_ref = job.get_mut("start_time")
                     .context("Failed to get start time!")?;
@@ -163,21 +187,21 @@ impl Into<TableEntry> for TableStat {
                 value_unit: None,
                 stat_type: TableStatType::JobOwner
             },
-            TableStat::JobName => TableEntry {
+            TableStat::JobName(len) => TableEntry {
                 name: String::from("Job Name"),
                 tooltip: String::from("<b>Job Name</b>"),
                 sort_by: Some(String::from("name")),
                 value: String::from("name"),
                 value_unit: None,
-                stat_type: TableStatType::JobName
+                stat_type: TableStatType::JobName(len)
             },
-            TableStat::JobNameMini => TableEntry {
-                name: String::from("Job Name"),
-                tooltip: String::from("<b>Job Name</b>"),
-                sort_by: Some(String::from("name")),
-                value: String::from("name"),
+            TableStat::JobGroups(len) => TableEntry {
+                name: String::from("Groups"),
+                tooltip: String::from("<b>Job Groups</b>"),
+                sort_by: None,
+                value: String::from("groups"),
                 value_unit: None,
-                stat_type: TableStatType::JobNameMini
+                stat_type: TableStatType::JobGroups(len)
             },
             TableStat::Status => TableEntry {
                 name: String::from("Status"),
@@ -361,6 +385,54 @@ fn timestamp_field_to_date ( timestamp_field: &mut String ) {
 #[derive(Debug)]
 struct Toolkit;
 impl Toolkit {
+    pub fn total_successful_jobs (
+        &self,
+        jobs: &Vec<BTreeMap<String, String>>
+    ) -> usize {
+        jobs.iter()
+            .filter(|job| job.get("exit_status").unwrap_or(&"1".to_string()) == "0")
+            .count()
+    }
+    pub fn total_cpu_time (
+        &self,
+        jobs: &Vec<BTreeMap<String, String>>
+    ) -> String {
+        let mut total_hours = 0;
+        let mut total_minutes: i32 = 0;
+        let mut total_seconds: i32 = 0;
+
+        for job in jobs.iter() {
+            let time = job.get("used_cpu_time")
+                .and_then(|st| Some(st.to_owned()))
+                .unwrap_or(String::from("0"));
+            
+            if let Some(hours) = time.split(':').nth(0) {
+                total_hours += hours.parse::<i32>().unwrap_or(0)
+            } else {
+                continue;
+            }
+            if let Some(minutes) = time.split(':').nth(1) {
+                total_minutes += minutes.parse::<i32>().unwrap_or(0)
+            } else {
+                continue;
+            }
+            if let Some(seconds) = time.split(':').nth(2) {
+                total_seconds += seconds.parse::<i32>().unwrap_or(0)
+            } else {
+                continue;
+            }
+        }
+
+        total_minutes += total_seconds / 60;
+        total_seconds %= 60;
+        total_hours += total_minutes / 60;
+        total_minutes %= 60;
+
+        let total_days = total_hours / 24;
+        total_hours %= 24;
+
+        format!("{:02}:{:02}:{:02}:{:02}", total_days, total_hours, total_minutes, total_seconds)
+    }
     pub fn to_i32 ( &self, num: &&String ) -> Result<i32> {
         Ok(num.parse::<f64>()
             .context("Failed to parse number!")?
@@ -374,9 +446,9 @@ impl Toolkit {
                 .context("Failed to parse number 2!")?;
         Ok(result)
     }
-    pub fn shorten ( &self, name_field: &&String, len: usize ) -> String {
-        if name_field.len() > len {
-            format!("{}...", &name_field[..len])
+    pub fn shorten ( &self, name_field: &&String, len: &usize ) -> String {
+        if name_field.len() > *len {
+            format!("{}...", &name_field[..(*len-4)])
         } else {
             (*name_field).clone()
         }
@@ -523,13 +595,16 @@ fn signal_to_str_suffix (
     signal: i32
 ) -> &'static str {
     match signal {
-        1 => " (SIGHUP)",
-        2 => " (SIGINT)",
-        3 => " (SIGQUIT)",
-        4 => " (SIGILL)",
-        5 => " (SIGTRAP)",
-        6 => " (SIGABRT)",
-        7 => " (SIGBUS)",
+        1  => " (SIGHUP)",
+        2  => " (SIGINT)",
+        3  => " (SIGQUIT)",
+        4  => " (SIGILL)",
+        5  => " (SIGTRAP)",
+        6  => " (SIGABRT)",
+        7  => " (SIGBUS)",
+        8  => " (SIGFPE)",
+        9  => " (SIGKILL)",
+        15 => " (SIGTERM)",
         _ => ""
     }
 }
@@ -603,6 +678,7 @@ fn try_render_template <T: ?Sized + askama::Template> (
 }
 #[tracing::instrument]
     fn sort_build_parse (
+        groups_cache: HashMap<String, HashSet<String>>,
         table_stats: Vec<TableStat>,
 
         jobs: &mut Vec<BTreeMap<String, String>>,
@@ -627,7 +703,7 @@ fn try_render_template <T: ?Sized + askama::Template> (
             add_exit_status_tooltip(job_ref);
 
             for table_stat in table_stats.iter() {
-                if let Err(e) = table_stat.adjust_job(job_ref) {
+                if let Err(e) = table_stat.adjust_job(&groups_cache, job_ref) {
                     errors.push(e);
                 }
                 if let Err(e) = table_stat.ensure_needed_field(job_ref) {
@@ -650,6 +726,9 @@ fn try_render_template <T: ?Sized + askama::Template> (
             // Print the errors if there are any
             error!(%errors, "Errors while parsing jobs!");
         }
+
+        // Reverse the results
+        jobs.reverse();
 
         (
             table_stats.into_iter()

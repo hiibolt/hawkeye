@@ -1,4 +1,4 @@
-use std::{collections::{BTreeMap, HashSet}, time::{SystemTime, UNIX_EPOCH}};
+use std::{collections::{BTreeMap, HashMap, HashSet}, time::{SystemTime, UNIX_EPOCH}};
 use chrono::{DateTime, Utc};
 
 use anyhow::{Context, Result, anyhow};
@@ -10,6 +10,7 @@ use super::super::remote::auth::verify_login;
 #[derive(Debug)]
 pub struct DB {
     conn: Connection,
+    groups_cache: HashMap<String, HashSet<String>>
 }
 pub struct LoginResult {
     pub success: bool,
@@ -92,6 +93,7 @@ impl DB {
         
         Ok(Self {
             conn,
+            groups_cache: HashMap::new()
         })
     }
     pub fn insert_job ( &mut self, job: &BTreeMap<&str, String> ) -> Result<()> {
@@ -150,6 +152,30 @@ impl DB {
         Ok(())
     }
 
+    pub fn get_groups_cache (
+        &self
+    ) -> HashMap<String, HashSet<String>> {
+        return self.groups_cache.clone();
+    }
+    pub fn insert_user_groups (
+        &mut self,
+        user: &str,
+        groups: Vec<&str>
+    ) -> Result<()> {
+        self.groups_cache.insert(
+            user.to_string(),
+            groups.iter()
+                .map(|&st| st.to_string())
+                .collect()
+        );
+
+        for group in groups {
+            self.insert_user_group(&user, group)
+                .with_context(|| format!("Couldn't insert user {user} into group {group}!"))?;
+        }
+
+        Ok(())
+    }
     pub fn insert_user_group (
         &mut self,
         user: &str,

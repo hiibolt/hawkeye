@@ -85,11 +85,16 @@ pub async fn running(
     };
     
     // Tweak data to be presentable and add tooltips for efficiencies
+    let groups_cache = app.lock().await
+        .db
+        .get_groups_cache();
     let (table_entries, errors) = sort_build_parse(
+        groups_cache,
         vec!(
             TableStat::JobID,
             TableStat::JobOwner,
-            TableStat::JobName,
+            TableStat::JobName(10),
+            TableStat::JobGroups(10),
             TableStat::Status,
             TableStat::StartTime,
             TableStat::Queue,
