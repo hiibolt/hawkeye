@@ -78,7 +78,7 @@ async fn main() -> ! {
         .with_state(state.clone());
 
     // Nest the API into the general app router
-    let app = Router::new()
+    let mut app = Router::new()
         .nest(&(url_prefix.clone() + "/api/v1"), api_v1)
         .route(&(url_prefix.clone() + "/"), get(routes::pages::running::running))
         .route(&(url_prefix.clone() + "/login"), get(routes::pages::login::login))
@@ -86,7 +86,13 @@ async fn main() -> ! {
         .route(&(url_prefix.clone() + "/running"), get(routes::pages::running::running))
         .route(&(url_prefix.clone() + "/completed"), get(routes::pages::completed::completed))
         .route(&(url_prefix.clone() + "/search"), get(routes::pages::search::search))
-        .route(&(url_prefix + "/public/images/favicon.ico"), get(routes::get_favicon))
+        .route(&(url_prefix.clone() + "/public/images/favicon.ico"), get(routes::get_favicon));
+
+    if !url_prefix.is_empty() {
+        app = app.route(&url_prefix, get(routes::pages::running::running));
+    }
+
+    let app = app
         .layer(session_layer)
         .with_state(state.clone());
 
