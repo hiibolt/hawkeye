@@ -30,6 +30,8 @@ pub async fn login(
 ) -> Result<Response, (StatusCode, String)> {
     info!("[ Got request to build login page...]");
 
+    let url_prefix = app.lock().await.url_prefix.clone();
+
     let template = LoginPageTemplate {
         title: "Login - CRCD Batchmon".to_string(),
         username: None,
@@ -39,7 +41,7 @@ pub async fn login(
                     .unwrap_or(false))
             })
             .unwrap_or(false),
-        url_prefix: app.lock().await.url_prefix.clone(),
+        url_prefix,
     };
 
     try_render_template(&template)

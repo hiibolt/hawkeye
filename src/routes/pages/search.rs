@@ -136,6 +136,7 @@ pub async fn search(
         &params,
         username.clone()
     );
+    let url_prefix = app.lock().await.url_prefix.clone();
 
     // Build jobs and template
     let template = SearchPageTemplate {
@@ -164,7 +165,7 @@ pub async fn search(
         user_query: params.get("user").and_then(|st| Some(st.to_owned())),
         name_query: params.get("name").and_then(|st| Some(st.to_owned())),
         date_query,
-        url_prefix: app.lock().await.url_prefix.clone(),
+        url_prefix,
 
         toolkit:Toolkit
     };

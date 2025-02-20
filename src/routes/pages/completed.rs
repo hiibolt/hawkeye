@@ -119,6 +119,7 @@ pub async fn completed(
         &params,
         username.clone()
     );
+    let url_prefix = app.lock().await.url_prefix.clone();
 
     // Build the template
     let template = CompletedPageTemplate {
@@ -145,7 +146,7 @@ pub async fn completed(
 
         user_query,
         date_query,
-        url_prefix: app.lock().await.url_prefix.clone(),
+        url_prefix,
 
         toolkit:Toolkit
     };

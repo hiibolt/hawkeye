@@ -93,6 +93,8 @@ pub async fn stats(
         None
     };
 
+    let url_prefix = app.lock().await.url_prefix.clone();
+
     // Build template
     let template = StatsPageTemplate {
         alert: if let Some(_) = username {
@@ -114,7 +116,7 @@ pub async fn stats(
 
         job,
         jobs: vec!(),
-        url_prefix: app.lock().await.url_prefix.clone(),
+        url_prefix,
 
         toolkit:Toolkit
     };

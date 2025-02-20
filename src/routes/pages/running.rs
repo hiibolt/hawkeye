@@ -113,6 +113,7 @@ pub async fn running(
         &params,
         username.clone()
     );
+    let url_prefix = app.lock().await.url_prefix.clone();
     
     // Build template
     let template = RunningPageTemplate {
@@ -129,7 +130,7 @@ pub async fn running(
         table_entries,
 
         cluster_status: app.lock().await.status,
-        url_prefix: app.lock().await.url_prefix.clone(),
+        url_prefix,
 
         toolkit: Toolkit
     };
