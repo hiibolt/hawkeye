@@ -16,7 +16,7 @@ use tracing::{error, info};
 
 #[derive(Template, Debug)]
 #[template(path = "pages/completed.html")]
-struct CompletedPageTemplate {
+struct CompletedPageTemplate<'a> {
     username: Option<String>,
     needs_login: bool,
     title: String,
@@ -27,7 +27,7 @@ struct CompletedPageTemplate {
 
     user_query: Option<String>,
     date_query: Option<String>,
-    url_prefix: String,
+    url_prefix: &'a str,
 
     toolkit: Toolkit
 }
@@ -117,7 +117,7 @@ pub async fn completed(
         &params,
         username.clone()
     );
-    let url_prefix = app.lock().await.url_prefix.clone();
+    let url_prefix = &app.url_prefix;
 
     // Build the template
     let template = CompletedPageTemplate {

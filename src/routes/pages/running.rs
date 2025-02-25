@@ -19,7 +19,7 @@ use tracing::{info, error};
 
 #[derive(Template, Debug)]
 #[template(path = "pages/running.html")]
-struct RunningPageTemplate {
+struct RunningPageTemplate<'a> {
     username: Option<String>,
     needs_login: bool,
     title: String,
@@ -29,7 +29,7 @@ struct RunningPageTemplate {
     table_entries: Vec<TableEntry>,
 
     cluster_status: Option<ClusterStatus>,
-    url_prefix: String,
+    url_prefix: &'a str,
 
     toolkit: Toolkit
 }
@@ -110,7 +110,7 @@ pub async fn running(
         &params,
         username.clone()
     );
-    let url_prefix = app.lock().await.url_prefix.clone();
+    let url_prefix = &app.url_prefix;
     
     // Build template
     let template = RunningPageTemplate {

@@ -52,7 +52,7 @@ pub async fn login (
         tasks.join_all().await;
     }
 
-    let url_prefix = app.lock().await.url_prefix.clone();
+    let url_prefix = app.url_prefix.clone();
     
     match login_result.success {
         true => {

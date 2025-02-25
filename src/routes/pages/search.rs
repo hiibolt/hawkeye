@@ -16,7 +16,7 @@ use tracing::{info, error};
 
 #[derive(Template, Debug)]
 #[template(path = "pages/search.html")]
-struct SearchPageTemplate {
+struct SearchPageTemplate<'a> {
     username: Option<String>,
     needs_login: bool,
     title: String,
@@ -30,7 +30,7 @@ struct SearchPageTemplate {
     user_query: Option<String>,
     name_query: Option<String>,
     date_query: Option<String>,
-    url_prefix: String,
+    url_prefix: &'a str,
 
     toolkit: Toolkit
 }
@@ -134,7 +134,7 @@ pub async fn search(
         &params,
         username.clone()
     );
-    let url_prefix = app.lock().await.url_prefix.clone();
+    let url_prefix = &app.url_prefix;
 
     // Build jobs and template
     let template = SearchPageTemplate {

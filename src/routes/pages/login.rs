@@ -9,28 +9,27 @@ use axum::{
     extract::{Query, State},
     http::StatusCode, response::Response
 };
-use tokio::sync::Mutex;
 use tower_sessions::Session;
 use askama::Template;
 use tracing::info;
 
 #[derive(Template, Debug)]
 #[template(path = "pages/login.html")]
-struct LoginPageTemplate {
+struct LoginPageTemplate<'a> {
     title: String,
     username: Option<String>,
     failed: bool,
-    url_prefix: String,
+    url_prefix: &'a str
 }
 #[tracing::instrument]
 pub async fn login(
-    State(app): State<Arc<Mutex<AppState>>>,
+    State(app): State<Arc<AppState>>,
     Query(params): Query<HashMap<String, String>>,
     session: Session,
 ) -> Result<Response, (StatusCode, String)> {
     info!("[ Got request to build login page...]");
 
-    let url_prefix = app.lock().await.url_prefix.clone();
+    let url_prefix = &app.url_prefix;
 
     let template = LoginPageTemplate {
         title: "Login - CRCD Batchmon".to_string(),

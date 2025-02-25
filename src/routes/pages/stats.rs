@@ -16,7 +16,7 @@ use tracing::{error, info, warn};
 
 #[derive(Template, Debug)]
 #[template(path = "pages/stats.html")]
-struct StatsPageTemplate {
+struct StatsPageTemplate<'a> {
     username: Option<String>,
     title: String,
     header: String,
@@ -27,7 +27,7 @@ struct StatsPageTemplate {
         Vec<BTreeMap<String, String>>
     )>,
     jobs: Vec<BTreeMap<String, String>>,
-    url_prefix: String,
+    url_prefix: &'a str,
     
     toolkit: Toolkit
 }
@@ -90,7 +90,7 @@ pub async fn stats(
         None
     };
 
-    let url_prefix = app.lock().await.url_prefix.clone();
+    let url_prefix = &app.url_prefix;
 
     // Build template
     let template = StatsPageTemplate {
