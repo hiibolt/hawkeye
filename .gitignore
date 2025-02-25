@@ -1,9 +1,10 @@
 /target
 /.direnv
+/result
 .envrc
 *.db
 .env
 *.AppImage
 result
 *.tar.gz
-start.sh
+*.sh
