@@ -4,7 +4,6 @@ use axum::{
 use serde::Deserialize;
 use tower_sessions::Session;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio::task::JoinSet;
 use tracing::{error, warn};
 
@@ -17,7 +16,7 @@ pub struct LoginRequest {
 }
 #[tracing::instrument]
 pub async fn login (
-    State(app): State<Arc<Mutex<AppState>>>,
+    State(app): State<Arc<AppState>>,
     session: Session,
     Form(payload): Form<LoginRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
@@ -25,15 +24,12 @@ pub async fn login (
     session.clear().await;
 
     // Attempt to verify (username, password) with your "verify_login"
-    let (remote_username, remote_hostname) = {
-        let state = app.lock().await;
-        
-        (state.remote_username.clone(), state.remote_hostname.clone())
-    };
+    let remote_username = app.remote_username.clone();
+    let remote_hostname = app.remote_hostname.clone();
 
-    let login_result = app.lock()
-        .await
+    let login_result = app
         .db
+        .lock().await
         .login(
             &remote_username,
             &remote_hostname,

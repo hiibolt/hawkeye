@@ -9,7 +9,6 @@ use std::{collections::BTreeMap, sync::Arc};
 use anyhow::Result;
 use axum::extract::Query;
 use axum::response::Response;
-use tokio::sync::Mutex;
 use axum::{
     extract::State,
     http::StatusCode
@@ -36,7 +35,7 @@ struct RunningPageTemplate {
 }
 #[tracing::instrument]
 pub async fn running(
-    State(app): State<Arc<Mutex<AppState>>>,
+    State(app): State<Arc<AppState>>,
     Query(params): Query<HashMap<String, String>>,
     session: Session,
 ) -> Result<Response, (StatusCode, String)> {
@@ -52,9 +51,8 @@ pub async fn running(
 
     // Get all running jobs
     let mut jobs = if let Some(_) = username {
-        app.lock()
-            .await
-            .db
+        app.db
+            .lock().await
             .get_all_jobs(
                 Some(vec!("R", "Q")),
                 None,
@@ -68,9 +66,8 @@ pub async fn running(
                 (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get all jobs!".to_string())
             })?
     } else {
-        app.lock()
-            .await
-            .db
+        app.db
+            .lock().await
             .get_all_jobs(
                 Some(vec!("R", "Q")),
                 None,
@@ -86,8 +83,8 @@ pub async fn running(
     };
     
     // Tweak data to be presentable and add tooltips for efficiencies
-    let groups_cache = app.lock().await
-        .db
+    let groups_cache = app.db
+        .lock().await
         .get_groups_cache();
     let (table_entries, errors) = sort_build_parse(
         groups_cache,
@@ -129,7 +126,7 @@ pub async fn running(
         alert: errors,
         table_entries,
 
-        cluster_status: app.lock().await.status,
+        cluster_status: *app.status.read().await,
         url_prefix,
 
         toolkit: Toolkit

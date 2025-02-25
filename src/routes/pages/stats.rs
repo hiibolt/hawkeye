@@ -5,7 +5,6 @@ use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::Result;
 use axum::response::Response;
-use tokio::sync::Mutex;
 use axum::{
     extract::{Query, State},
     http::StatusCode
@@ -34,7 +33,7 @@ struct StatsPageTemplate {
 }
 #[tracing::instrument]
 pub async fn stats(
-    State(app): State<Arc<Mutex<AppState>>>,
+    State(app): State<Arc<AppState>>,
     Query(params): Query<BTreeMap<String, String>>,
     session: Session,
 ) -> Result<Response, (StatusCode, String)> {
@@ -60,17 +59,15 @@ pub async fn stats(
                     (StatusCode::BAD_REQUEST, "Failed to parse ID!".to_string())
                 })?;
 
-            let mut job = app.lock()
-                .await
-                .db
+            let mut job = app.db
+                .lock().await
                 .get_job(id)
                 .map_err(|e| {
                     error!(%e, "Couldn't get job!");
                     (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get job!".to_string())
                 })?;
-            let stats = app.lock()
-                .await
-                .db
+            let stats = app.db
+                .lock().await
                 .get_job_stats(id)
                 .map_err(|e| {
                     error!(%e, "Couldn't get job stats!");

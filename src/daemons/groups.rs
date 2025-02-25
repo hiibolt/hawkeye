@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use tokio::task::JoinSet;
-use tokio::sync::Mutex;
 use tracing::{info, error};
 
 use crate::routes::AppState;
@@ -12,7 +11,7 @@ const GROUPS_PERIOD: u64 = 60 * 60;
 
 #[tracing::instrument]
 pub async fn grab_group_thread (
-    app: Arc<Mutex<AppState>>,
+    app: Arc<AppState>,
     remote_username: String,
     remote_hostname: String,
     user: String
@@ -34,8 +33,8 @@ pub async fn grab_group_thread (
         .collect();
     info!("Got groups for `{user}`: {groups:?}");
 
-    app.lock().await
-        .db
+    app.db
+        .lock().await
         .insert_user_groups(&user, groups)
         .context("Couldn't insert user groups!")?;
     
@@ -44,27 +43,21 @@ pub async fn grab_group_thread (
     Ok(())
 }
 #[tracing::instrument]
-async fn grab_groups_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
+async fn grab_groups_helper ( app: Arc<AppState> ) -> Result<()> {
     // Get a list of all users from the DB
-    let users = app.lock().await
-        .db
+    let users = app.db
+        .lock().await
         .get_users()
         .context("Couldn't get users!")?;
 
     info!("[ Got Users ]: {users:?}");
 
-    let (remote_username, remote_hostname) = {
-        let state = app.lock().await;
-        
-        (state.remote_username.clone(), state.remote_hostname.clone())
-    };
-
     // Spawn a task for each user, but collect the JoinHandles
     let mut tasks = JoinSet::new();
     for user in users {
         let app = app.clone();
-        let remote_username = remote_username.clone();
-        let remote_hostname = remote_hostname.clone();
+        let remote_username = app.remote_username.clone();
+        let remote_hostname = app.remote_hostname.clone();
         let user_cloned = user.clone();
         tasks.spawn(async move {
             // We deliberately swallow the actual Result here, but you could propagate it
@@ -85,7 +78,7 @@ async fn grab_groups_helper ( app: Arc<Mutex<AppState>> ) -> Result<()> {
     Ok(())
 }
 pub async fn groups_daemon (
-    app: Arc<Mutex<AppState>>
+    app: Arc<AppState>
 ) -> ! {
     let groups_period = std::env::var("GROUPS_DAEMON_PERIOD")
         .unwrap_or(GROUPS_PERIOD.to_string())

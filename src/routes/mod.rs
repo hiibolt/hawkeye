@@ -23,10 +23,10 @@ pub struct ClusterStatus {
 pub struct AppState {
     pub remote_username: String,
     pub remote_hostname: String,
-    pub db: super::DB,
+    pub db: tokio::sync::Mutex<super::DB>,
     pub url_prefix: String,
 
-    pub status: Option<ClusterStatus>
+    pub status: tokio::sync::RwLock<Option<ClusterStatus>>
 }
 /*
 struct HtmlTemplate<T>(T);

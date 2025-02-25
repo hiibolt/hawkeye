@@ -4,7 +4,6 @@ use anyhow::{anyhow, bail, Context, Result};
 use regex::Regex;
 use tracing::{error, info};
 use tokio::task::JoinSet;
-use tokio::sync::Mutex;
 
 use crate::routes::AppState;
 use super::super::{
@@ -17,7 +16,7 @@ const DEFAULT_OLD_JOB_PERIOD: u64 = 60 * 30;
 
 #[tracing::instrument]
 pub async fn grab_old_jobs_thread (
-    app: Arc<Mutex<AppState>>,
+    app: Arc<AppState>,
     remote_username: String,
     remote_hostname: String,
     user: String
@@ -111,8 +110,8 @@ pub async fn grab_old_jobs_thread (
         .collect::<Vec<BTreeMap<&str, String>>>();
     
     for job in jobs.iter() {
-        app.lock().await
-            .db
+        app.db
+            .lock().await
             .insert_job(job)
             .with_context(|| format!("Couldn't insert job {job:?}!"))?;
     }
@@ -121,19 +120,17 @@ pub async fn grab_old_jobs_thread (
 }
 #[tracing::instrument]
 async fn grab_old_jobs_helper (
-    app: Arc<Mutex<AppState>>
+    app: Arc<AppState>
 ) -> Result<()> {
     // Get a list of all users from the DB
-    let users = app.lock().await
+    let users = app
         .db
+        .lock().await
         .get_users()
         .context("Couldn't get users!")?;
 
-    let (remote_username, remote_hostname) = {
-        let state = app.lock().await;
-        
-        (state.remote_username.clone(), state.remote_hostname.clone())
-    };
+    let remote_username = app.remote_username.clone();
+    let remote_hostname = app.remote_hostname.clone();
 
     let mut tasks = JoinSet::new();
     for user in users {
@@ -158,7 +155,7 @@ async fn grab_old_jobs_helper (
     Ok(())
 }
 pub async fn old_jobs_daemon (
-    app: Arc<Mutex<AppState>>
+    app: Arc<AppState>
 ) -> ! {
     let old_job_period = std::env::var("OLD_JOBS_DAEMON_PERIOD")
         .unwrap_or_else(|_| DEFAULT_OLD_JOB_PERIOD.to_string())
@@ -188,13 +185,10 @@ pub async fn old_jobs_daemon (
 }
 #[tracing::instrument]
 async fn grab_jobs_helper (
-    app: Arc<Mutex<AppState>>
+    app: Arc<AppState>
 ) -> Result<()> {
-    let (username, hostname) = {
-        let state = app.lock().await;
-        
-        (state.remote_username.clone(), state.remote_hostname.clone())
-    };
+    let username = app.remote_username.clone();
+    let hostname = app.remote_hostname.clone();
 
     let jobstat_output: String = remote_command(
         &username,
@@ -235,8 +229,7 @@ async fn grab_jobs_helper (
         bail!("Invalid cluster status data!")
     }
     
-    let mut app_lock = app.lock().await;
-    app_lock.status = Some(crate::routes::ClusterStatus {
+    *app.status.write().await = Some(crate::routes::ClusterStatus {
         total_nodes: node_stats[2].parse::<u32>()?,
         used_nodes: node_stats[0].parse::<u32>()?,
         total_cpus: cpu_stats[2].parse::<u32>()?,
@@ -244,7 +237,6 @@ async fn grab_jobs_helper (
         total_gpus: gpu_stats[2].parse::<u32>()?,
         used_gpus: gpu_stats[0].parse::<u32>()?
     });
-    drop(app_lock);
 
     let job_strs: Vec<&str> = jobstat_output.split("--------------------\n")
         .nth(1)
@@ -269,23 +261,23 @@ async fn grab_jobs_helper (
         .collect::<Vec<BTreeMap<&str, String>>>();
 
     for job in jobs.iter() {
-        app.lock().await
-            .db
+        app.db
+            .lock().await
             .insert_job(job)
             .with_context(|| "Couldn't insert job {job:?}!")?;
     }
 
     // Mark jobs that are no longer active as 'S' (stopped)
     info!("Marking completed jobs...");
-    app.lock().await
-        .db
+    app.db
+        .lock().await
         .mark_completed_jobs(&jobs)
         .context("Couldn't mark complete jobs!")?;
     info!("Completed jobs marked!");
 
     Ok(())
 }
-pub async fn jobs_daemon ( app: Arc<Mutex<AppState>> ) -> ! {
+pub async fn jobs_daemon ( app: Arc<AppState> ) -> ! {
     let jobstat_period = std::env::var("JOBS_DAEMON_PERIOD")
         .unwrap_or_else(|_| DEFAULT_JOBSTAT_PERIOD.to_string())
         .parse::<u64>()

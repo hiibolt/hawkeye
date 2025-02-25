@@ -4,7 +4,6 @@ use super::{sort_build_parse, try_render_template, Toolkit, TableEntry, TableSta
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
 use anyhow::Result;
-use tokio::sync::Mutex;
 use axum::{
     extract::{Query, State}, response::Response
 };
@@ -34,7 +33,7 @@ struct CompletedPageTemplate {
 }
 #[tracing::instrument]
 pub async fn completed(
-    State(app): State<Arc<Mutex<AppState>>>,
+    State(app): State<Arc<AppState>>,
     Query(params): Query<HashMap<String, String>>,
     session: Session,
 ) -> Result<Response, (StatusCode, String)> {
@@ -73,9 +72,8 @@ pub async fn completed(
 
     // Get the jobs
     let mut jobs = if let Some(_) = username {    
-        app.lock()
-            .await
-            .db
+        app.db
+            .lock().await
             .get_user_jobs(
                 &user_query.clone().expect("Unreachable"),
                 Some(&"E".to_string()),
@@ -93,8 +91,8 @@ pub async fn completed(
     };
 
     // Tweak data to be presentable and add tooltips for efficiencies
-    let groups_cache = app.lock().await
-        .db
+    let groups_cache = app.db
+        .lock().await
         .get_groups_cache();
     let (table_entries, errors) = sort_build_parse(
         groups_cache,

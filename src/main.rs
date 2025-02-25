@@ -11,7 +11,7 @@ use routes::AppState;
 
 use std::sync::Arc;
 
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use axum::{
     routing::{get, post}, Router
 };
@@ -35,19 +35,19 @@ async fn main() -> ! {
     // Create the shared state
     let url_prefix = std::env::var("URL_PREFIX")
         .unwrap_or(String::new());
-    let state: Arc<Mutex<AppState>> = Arc::new(Mutex::new(AppState {
+    let state: Arc<AppState> = Arc::new(AppState {
         remote_username: std::env::var("REMOTE_USERNAME")
             .expect("Missing `REMOTE_USERNAME` environment variable!"),
         remote_hostname: std::env::var("REMOTE_HOSTNAME")
             .expect("Missing `REMOTE_HOSTNAME` environment variable!"),
-        db: DB::new(
+        db: Mutex::new(DB::new(
             &std::env::var("DB_PATH")
                 .expect("Missing `DB_PATH` environment variable!")
-        ).expect("Failed to establish connection to DB!"),
+        ).expect("Failed to establish connection to DB!")),
         url_prefix: url_prefix.clone(),
 
-        status: None
-    }));
+        status: RwLock::new(None)
+    });
     
     info!("[ Starting daemons... ]");
     tokio::spawn(jobs_daemon(state.clone()));

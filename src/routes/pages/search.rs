@@ -5,7 +5,6 @@ use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
 use anyhow::Result;
 use axum::response::Response;
-use tokio::sync::Mutex;
 use axum::{
     extract::{Query, State},
     http::StatusCode
@@ -37,7 +36,7 @@ struct SearchPageTemplate {
 }
 #[tracing::instrument]
 pub async fn search(
-    State(app): State<Arc<Mutex<AppState>>>,
+    State(app): State<Arc<AppState>>,
     Query(params): Query<HashMap<String, String>>,
     session: Session,
 ) -> Result<Response, (StatusCode, String)> {
@@ -79,9 +78,8 @@ pub async fn search(
     // Get all running jobs
     let mut jobs = if let Some(_) = username {
         if any_filters {
-            app.lock()
-                .await
-                .db
+            app.db
+                .lock().await
                 .get_all_jobs(
                     params.get("state")
                         .and_then(|st| Some(vec!(st.as_str()))),
@@ -103,8 +101,8 @@ pub async fn search(
     };
 
     // Tweak data to be presentable and add tooltips for efficiencies
-    let groups_cache = app.lock().await
-        .db
+    let groups_cache = app.db
+        .lock().await
         .get_groups_cache();
     let (table_entries, errors) = sort_build_parse(
         groups_cache,
