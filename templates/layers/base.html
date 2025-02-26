@@ -132,7 +132,7 @@
         </div>
         <div class="auth">
             <a href="{{ url_prefix }}/running">
-                <button class="header-button"><b>Metis Overview</b></button>
+                <button class="header-button"><b>Submitted Jobs</b></button>
             </a>
             <a href="{{ url_prefix }}/completed">
                 <button class="header-button"><b>Completed Jobs</b></button>
@@ -149,7 +149,7 @@
                         signout_button.addEventListener('click', () => {
                             // Send a post request (with credentials) to `api/v1/auth/logout`,
                             //  then redirect to the root page.
-                            fetch('{{ url_prefix }}api/v1/auth/logout', {
+                            fetch('{{ url_prefix }}/api/v1/auth/logout', {
                                 method: 'POST',
                                 credentials: 'include'
                             }).then(() => {

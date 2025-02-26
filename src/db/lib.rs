@@ -312,8 +312,7 @@ impl DB {
         filter_queue: Option<&String>,
         filter_owner: Option<&String>,
         filter_name: Option<&String>,
-        filter_date: Option<&String>,
-        censor: bool
+        filter_date: Option<&String>
     ) -> Result<Vec<BTreeMap<String, String>>> {
         let mut additional_filters= String::new();
         let mut params = vec![];
@@ -376,7 +375,7 @@ impl DB {
             Ok(BTreeMap::from_iter(vec![
                 ("pbs_id".to_string(), row.get::<_, i32>(0)?.to_string()),
                 ("name".to_string(), row.get::<_, String>(1)?),
-                ("owner".to_string(), if censor { "REDACTED".to_string() } else { row.get::<_, String>(2)? }),
+                ("owner".to_string(), row.get::<_, String>(2)?),
                 ("state".to_string(), row.get::<_, String>(3)?),
                 ("start_time".to_string(), row.get::<_, i32>(4)?.to_string()),
                 ("queue".to_string(), row.get::<_, String>(5)?),

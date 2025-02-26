@@ -297,8 +297,8 @@ pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, 
 
     info!("\t[ Converting Resource List Nodes Field... ]");
     let walltime_efficiency = walltime_to_percentage(
-        &entry["Resource_List.walltime"],
-        &entry["resources_used.walltime"]
+        &entry.get("Resource_List.walltime").unwrap_or(&String::from("00:00:01")),
+        &entry.get("resources_used.walltime").unwrap_or(&String::from("00:00:01"))
     ).map_err(|e| anyhow!("Couldn't calculate walltime efficiency! Error: {e:?}"))?;
     entry.insert("walltime_efficiency", walltime_efficiency.to_string());
 

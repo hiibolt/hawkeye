@@ -50,37 +50,19 @@ pub async fn running(
         })?;
 
     // Get all running jobs
-    let mut jobs = if let Some(_) = username {
-        app.db
-            .lock().await
-            .get_all_jobs(
-                Some(vec!("R", "Q")),
-                None,
-                None,
-                None,
-                None,
-                false
-            )
-            .map_err(|e| {
-                error!(%e, "Couldn't get all jobs!");
-                (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get all jobs!".to_string())
-            })?
-    } else {
-        app.db
-            .lock().await
-            .get_all_jobs(
-                Some(vec!("R", "Q")),
-                None,
-                None,
-                None,
-                None,
-                true
-            )
-            .map_err(|e| {
-                error!(%e, "Couldn't get all jobs!");
-                (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get all jobs!".to_string())
-            })?
-    };
+    let mut jobs = app.db
+        .lock().await
+        .get_all_jobs(
+            Some(vec!("R", "Q")),
+            None,
+            None,
+            None,
+            None
+        )
+        .map_err(|e| {
+            error!(%e, "Couldn't get all jobs!");
+            (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get all jobs!".to_string())
+        })?;
     
     // Tweak data to be presentable and add tooltips for efficiencies
     let groups_cache = app.db
@@ -92,7 +74,7 @@ pub async fn running(
             TableStat::JobID,
             TableStat::JobOwner,
             TableStat::JobName(10),
-            TableStat::JobGroups(10),
+            TableStat::JobProject,
             TableStat::Status,
             TableStat::StartTime,
             TableStat::Queue,

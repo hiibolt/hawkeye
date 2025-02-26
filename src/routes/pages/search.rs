@@ -86,8 +86,7 @@ pub async fn search(
                     params.get("queue"),
                     params.get("user"),
                     params.get("name"),
-                    Some(&timestamp_filter),
-                    false
+                    Some(&timestamp_filter)
                 )
                 .map_err(|e| {
                     error!(%e, "Couldn't get all jobs!");
@@ -134,9 +133,9 @@ pub async fn search(
         &params,
         username.clone()
     );
-    let url_prefix = &app.url_prefix;
 
     // Build jobs and template
+    let url_prefix = &app.url_prefix;
     let template = SearchPageTemplate {
         alert: if username.is_none() {
                 Some("You are not logged in!".to_string())

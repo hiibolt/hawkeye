@@ -11,8 +11,8 @@ use crate::{daemons::{groups::grab_group_thread, jobs::grab_old_jobs_thread}, ro
 
 #[derive(Deserialize, Debug)]
 pub struct LoginRequest {
-    username: String,
-    password: String,
+    one: String, // Username (labelled as "one" to avoid autofill)
+    two: String, // Password (labelled as "two" to avoid autofill)
 }
 #[tracing::instrument]
 pub async fn login (
@@ -27,14 +27,17 @@ pub async fn login (
     let remote_username = app.remote_username.clone();
     let remote_hostname = app.remote_hostname.clone();
 
+    let username = &payload.one;
+    let password = &payload.two;
+
     let login_result = app
         .db
         .lock().await
         .login(
             &remote_username,
             &remote_hostname,
-            &payload.username,
-            &payload.password
+            username,
+            password
         )
         .await
         .map_err(|e| {
@@ -46,8 +49,8 @@ pub async fn login (
         // Lookup groups and old jobs for the user
         let mut tasks = JoinSet::new();
         
-        tasks.spawn(grab_group_thread(app.clone(), remote_username.clone(), remote_hostname.clone(), payload.username.clone()));
-        tasks.spawn(grab_old_jobs_thread(app.clone(), remote_username, remote_hostname, payload.username.clone()));
+        tasks.spawn(grab_group_thread(app.clone(), remote_username.clone(), remote_hostname.clone(), username.to_string()));
+        tasks.spawn(grab_old_jobs_thread(app.clone(), remote_username, remote_hostname, username.to_string()));
         
         tasks.join_all().await;
     }
@@ -61,7 +64,7 @@ pub async fn login (
             // let groups = some_function_to_get_groups_for(&payload.username);
             
             // Now store that in the session
-            session.insert("username", &payload.username).await
+            session.insert("username", username).await
                 .map_err(|e| {
                     error!(%e, "Couldn't insert username into session!");
                     (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't insert username into session!".to_string())

@@ -13,11 +13,11 @@ pub mod stats;
 enum TableStatType {
     Default,
 
-    Colored,
+    ColoredRG,  // Red to Green
+    ColoredYGR, // Yellow to Green to Red
 
     JobID,
     JobName(usize),
-    JobGroups(usize),
     JobOwner,
     ExitStatus,
     More
@@ -27,7 +27,7 @@ enum TableStat {
     JobID,
     JobOwner,
     JobName(usize),
-    JobGroups(usize),
+    JobProject,
     Status,
     StartTime,
     EndTime,
@@ -63,27 +63,18 @@ impl TableStat {
         job: &mut BTreeMap<String, String>
     ) -> Result<()> {
         match self {
-            TableStat::JobGroups(_) => {
+            TableStat::JobProject => {
                 let owner = job.get("owner")
                     .context("Missing `owner` field!")?;
 
-                if owner == "REDACTED" {
-                    job.insert(
-                        String::from("groups"),
-                        String::from("REDACTED")
-                    );
-                    
-                    return Ok(());
-                }
-
                 job.insert(
-                    String::from("groups"),
+                    String::from("project"),
                     group_cache.get(owner)
-                        .unwrap_or(&HashSet::from([String::from("None")]))
+                        .unwrap_or(&HashSet::new())
                         .into_iter()
-                        .map(|st| st.to_owned())
-                        .collect::<Vec<String>>()
-                        .join(",")
+                        .next()
+                        .and_then(|st| Some(st.to_owned()))
+                        .unwrap_or(String::from("None"))
                 );
             }
             TableStat::StartTime => {
@@ -195,13 +186,13 @@ impl Into<TableEntry> for TableStat {
                 value_unit: None,
                 stat_type: TableStatType::JobName(len)
             },
-            TableStat::JobGroups(len) => TableEntry {
-                name: String::from("Groups"),
-                tooltip: String::from("<b>Job Groups</b>"),
+            TableStat::JobProject => TableEntry {
+                name: String::from("Project"),
+                tooltip: String::from("<b>Job Project</b>"),
                 sort_by: None,
-                value: String::from("groups"),
+                value: String::from("project"),
                 value_unit: None,
-                stat_type: TableStatType::JobGroups(len)
+                stat_type: TableStatType::Default
             },
             TableStat::Status => TableEntry {
                 name: String::from("Status"),
@@ -305,7 +296,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("walltime_efficiency")),
                 value: String::from("walltime_efficiency"),
                 value_unit: None,
-                stat_type: TableStatType::Colored
+                stat_type: TableStatType::ColoredYGR
             },
             TableStat::CpuEfficiency => TableEntry {
                 name: String::from("CPU Usage"),
@@ -313,7 +304,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("cpu_efficiency")),
                 value: String::from("cpu_efficiency"),
                 value_unit: None,
-                stat_type: TableStatType::Colored
+                stat_type: TableStatType::ColoredRG
             },
             TableStat::MemEfficiency => TableEntry {
                 name: String::from("Memory Usage"),
@@ -321,7 +312,7 @@ impl Into<TableEntry> for TableStat {
                 sort_by: Some(String::from("mem_efficiency")),
                 value: String::from("mem_efficiency"),
                 value_unit: None,
-                stat_type: TableStatType::Colored
+                stat_type: TableStatType::ColoredRG
             },
             TableStat::NodesChunks => TableEntry {
                 name: String::from("Nodes/Chunks"),
@@ -582,9 +573,9 @@ fn add_efficiency_tooltips ( job: &mut BTreeMap<String, String> ) {
         format!("<b>Walltime Efficiency: {walltime_efficiency:.2}%</b>") 
         + "<br><br>"
         + match walltime_efficiency {
-            x if x < 50f32 => "Your job didn't use most of its wallitme, consider using less walltime to help queue times.",
-            x if x < 75f32 => "Your job is using the walltime somewhat efficiently.",
-            x if x >= 75f32 => "Your job is using the walltime very efficiently!",
+            x if x < 50f32 => "Your job didn't use most of its walltime, consider using less walltime to help queue times.",
+            x if x < 80f32 => "Your job is using the walltime efficiently.",
+            x if x >= 80f32 => "Your job is potentially using too much walltime, consider allocating more for breathing room to avoid having the job killed.",
             _ => "Abnormal walltime usage!"
         }
         + "<br><br>"
@@ -632,6 +623,8 @@ fn add_exit_status_tooltip ( job: &mut BTreeMap<String, String> ) {
             -12 => "Job was checkpointed and killed",
             -13 => "Job failed due to a bad password",
             -14 => "Job was requeued (if rerunnable) or deleted (if not) due to a communication failure between Mother Superior and a Sister",
+            -29 => "Job was terminated by PBS for using too much walltime.",
+            -27 => "Job was terminated by PBS for using too much memory.",
             x if x < 128 && x > 0 => "The exit value of the top process in the job, typically the shell.",
             x if x >= 128 => { 
                 "" // Computed in next if statement (to
@@ -650,7 +643,7 @@ fn add_exit_status_tooltip ( job: &mut BTreeMap<String, String> ) {
             String::new()
         } + 
         "<br><br>" +
-        "<a href=\"https://www.nas.nasa.gov/hecc/support/kb/pbs-exit-codes_185.html\">More information on PBS exit codes</a>"
+        "<a href=\"https://crcd.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#exitstatus\">More information on PBS exit codes</a>"
     );
 }
 fn try_render_template <T: ?Sized + askama::Template> (
@@ -729,6 +722,13 @@ fn try_render_template <T: ?Sized + askama::Template> (
 
         // Reverse the results
         jobs.reverse();
+
+        // Censor job owners if the user is not authenticated
+        if username.is_none() {
+            for job in jobs.iter_mut() {
+                job.insert(String::from("owner"), String::from("REDACTED"));
+            }
+        }
 
         (
             table_stats.into_iter()

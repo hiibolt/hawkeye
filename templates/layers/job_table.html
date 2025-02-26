@@ -107,28 +107,40 @@
                         {% else %}
                             <td>{{ toolkit.get_field(job, "name")? }}</td>
                         {% endif %}
-                    {% when TableStatType::JobGroups with (len) %}
-                        {% if toolkit.get_field(job, "groups")?.len()|as_ref > len %}
-                            <td class="popover__wrapper">
-                                <p>
-                                    {{ toolkit.shorten(toolkit.get_field(job, "groups")?|as_ref, len) }}ⓘ
-                                </p>
-                                <div class="popover__content">
-                                    <p class="popover__message">
-                                        <b>All Groups:</b><br>
-                                        {{ toolkit.get_field(job, "groups")? }}
-                                    </p>
-                                </div>
-                            </td>
-                        {% else %}
-                            <td>{{ toolkit.get_field(job, "groups")? }}</td>
-                        {% endif %}
-                    {% when TableStatType::Colored %}
+                    {% when TableStatType::ColoredRG %}
                         {% let eff = toolkit.get_field(job, table_entry.value|as_ref)? %}
                         {% match toolkit.to_i32(eff|as_ref) %}
                             {% when Ok with (eff) %}
                                 <td
                                     style="background-color: rgba({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0, 0.5);"
+                                    class="popover__wrapper"
+                                >
+                                    <div class="popover__content">
+                                        {{ toolkit.get_field(job, (table_entry.value.clone() + "_tooltip")|as_ref)?|escape("none") }}
+                                    </div>
+                                    <p style="white-space: nowrap;">{{ eff }}% ⓘ</p>
+                                </td>
+                            {% when Err with (_) %}
+                                <td style="background-color: rgba(255, 255, 0, 0.5);">{{ eff }}%</td>
+                        {% endmatch %}
+                    {% when TableStatType::ColoredYGR %}
+                        {% let eff = toolkit.get_field(job, table_entry.value|as_ref)? %}
+                        {% match toolkit.to_i32(eff|as_ref) %}
+                            {% when Ok with (eff) %}
+                                <td
+                                    style="background-color: rgba(
+                                        {% if eff <= 80|as_ref %}
+                                            {{ 255 - (255 * eff / 80) }}
+                                        {% else %}
+                                            {{ (255 * (eff - 80) / 20) }}
+                                        {% endif %},
+                                        {% if eff <= 80|as_ref %}
+                                            205
+                                        {% else %}
+                                            {{ 205 * (100 - eff) / 20 }}
+                                        {% endif %},
+                                        0, 0.5
+                                    );"
                                     class="popover__wrapper"
                                 >
                                     <div class="popover__content">

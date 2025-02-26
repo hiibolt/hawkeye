@@ -29,9 +29,6 @@
                 <p>Cluster Status: <span style="color: red;">Unknown</span></p>
         {% endmatch %}
     </div>
-    <div class="nav-item">
-        <p>This page is a wrapper around the <code>jobstat -anL</code> and <code>grep</code> commands, which returns a list of all running jobs on Metis.</p>
-    </div>
     {% match username %}
         {% when None %}
         <div class="nav-item">
