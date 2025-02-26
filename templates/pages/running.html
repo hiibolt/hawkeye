@@ -8,12 +8,6 @@
         {% match cluster_status %}
             {% when Some with (status) %}
                 <p>
-                    <b>Nodes ({{status.total_nodes}} total)</b>
-                    <br>
-                    <br>
-                    {{status.used_nodes}} in use / {{status.total_nodes - status.used_nodes}} available
-                </p>
-                <p>
                     <b>CPU Cores ({{status.total_cpus}} total)</b>
                     <br>
                     <br>
@@ -24,6 +18,12 @@
                     <br>
                     <br>
                     {{status.used_gpus}} in use / {{status.total_gpus - status.used_gpus}} available
+                </p>
+                <p>
+                    <b>Nodes ({{status.total_nodes}} total)</b>
+                    <br>
+                    <br>
+                    {{status.used_nodes}} in use
                 </p>
             {% when None %}
                 <p>Cluster Status: <span style="color: red;">Unknown</span></p>
