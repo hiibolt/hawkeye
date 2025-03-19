@@ -182,12 +182,12 @@ pub fn jmanl_job_str_to_btree<'a>(
 
     info!("\t[ Calculating Walltime Efficiency... ]");
     let walltime_efficiency = walltime_to_percentage(
-        &entry["Resource_List.walltime"],
-        &entry["resources_used.walltime"]
+        &entry.get("Resource_List.walltime").context("Missing field 'Resource_List.walltime'")?,
+        &entry.get("resources_used.walltime").context("Missing field 'resources_used.walltime'")?
     ).map_err(|e| anyhow!("Couldn't calculate walltime efficiency! Error: {e:?}"))?;
     entry.insert("walltime_efficiency".to_string(), walltime_efficiency.to_string());
 
-    info!("\t[ Calculating CPU Efficiency... ]");
+    info!("Calculating CPU Efficiency...");
     let cpu_efficiency = 
     ( entry.get("resources_used.cpupercent")
         .context("Missing field 'resources_used.cpupercent'")?

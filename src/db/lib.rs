@@ -99,31 +99,31 @@ impl DB {
     pub fn insert_job ( &mut self, job: &BTreeMap<&str, String> ) -> Result<()> {
         self.conn.execute(
             "INSERT OR IGNORE INTO Users (name) VALUES (?1)",
-            [&job["Job_Owner"]],
+            [&job.get("Job_Owner").context("Missing job owner")?],
         )?;
         
         // Add the job
         self.conn.execute(
             "INSERT OR REPLACE INTO Jobs (pbs_id, name, owner, state, start_time, queue, nodes, req_mem, req_cpus, req_gpus, req_walltime, req_select, mem_efficiency, walltime_efficiency, cpu_efficiency, used_cpu_percent, used_mem, used_walltime, end_time, chunks, exit_status, est_start_time, used_cpu_time) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
             params![
-                job["job_id"],
-                job["Job_Name"],
-                job["Job_Owner"],
-                job["job_state"],
-                job["start_time"],
-                job["queue"],
-                job["Nodes"],
-                job["Resource_List.mem"],
-                job["Resource_List.ncpus"],
+                job.get("job_id").context("Missing job ID")?,
+                job.get("Job_Name").context("Missing job name")?,
+                job.get("Job_Owner").context("Missing job owner")?,
+                job.get("job_state").context("Missing job state")?,
+                job.get("start_time").context("Missing job start time")?,
+                job.get("queue").context("Missing job queue")?,
+                job.get("Nodes").context("Missing job nodes")?,
+                job.get("Resource_List.mem").context("Missing job memory")?,
+                job.get("Resource_List.ncpus").unwrap_or(&String::from("0")),
                 job.get("Resource_List.ngpus").unwrap_or(&String::from("0")),
-                job["Resource_List.walltime"],
-                job["Resource_List.select"],
-                job["mem_efficiency"],
-                job["walltime_efficiency"],
-                job["cpu_efficiency"],
-                job["resources_used.cpupercent"],
-                job["resources_used.mem"],
-                job["resources_used.walltime"],
+                job.get("Resource_List.walltime").context("Missing job walltime")?,
+                job.get("Resource_List.select").context("Missing job select")?,
+                job.get("mem_efficiency").context("Missing job memory efficiency")?,
+                job.get("walltime_efficiency").context("Missing job walltime efficiency")?,
+                job.get("cpu_efficiency").context("Missing job CPU efficiency")?,
+                job.get("resources_used.cpupercent").context("Missing job CPU percent")?,
+                job.get("resources_used.mem").context("Missing job used memory")?,
+                job.get("resources_used.walltime").context("Missing job used walltime")?,
                 job.get("end_time").unwrap_or(&i32::MAX.to_string()),
                 job.get("chunks").unwrap_or(&String::from("Not Yet Done")),
                 job.get("Exit_status").unwrap_or(&String::from("Not Yet Done")),
@@ -142,9 +142,9 @@ impl DB {
         self.conn.execute(
             "INSERT INTO PastStats (pbs_id, cpu_percent, mem, datetime) VALUES (?1, ?2, ?3, ?4)",
             params![
-                job["job_id"],
-                job["resources_used.cpupercent"],
-                job["resources_used.mem"],
+                job.get("job_id").context("Missing job ID")?,
+                job.get("resources_used.cpupercent").context("Missing job CPU percent")?,
+                job.get("resources_used.mem").context("Missing job used memory")?,
                 formatted_datetime
             ],
         )?;
@@ -203,7 +203,7 @@ impl DB {
         // Build a set of IDs for *currently active* jobs
         let active_ids: HashSet<_> = active_jobs
             .iter()
-            .flat_map(|job| job["job_id"].parse::<i32>())
+            .flat_map(|job| Some(job.get("job_id")?.parse::<i32>().ok()?))
             .collect();
         
         // Find all jobs that are in state 'R' in our local DB

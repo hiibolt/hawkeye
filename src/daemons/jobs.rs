@@ -25,7 +25,7 @@ pub async fn grab_old_jobs_thread (
         &remote_username,
         &remote_hostname,
         "jmanl",
-        vec![&user, "year", "raw"],
+        vec!(&user, "year", "raw"),
         true
     ).await
         .context("Couldn't get output from `jmanl` command!")?;
@@ -161,13 +161,13 @@ pub async fn old_jobs_daemon (
         .unwrap_or_else(|_| DEFAULT_OLD_JOB_PERIOD.to_string())
         .parse::<u64>()
         .expect("Invalid `OLD_JOBS_DAEMON_PERIOD` value!");
-    info!("[ Old job period: {old_job_period} ]");
+    info!("Old job period: {old_job_period}");
 
     // Wait for the web server to start up
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
 
     loop {
-        info!("[ Pulling old jobs... ]");
+        info!("Pulling old jobs...");
         if let Err(e) = grab_old_jobs_helper( app.clone() ).await {
             error!(%e, "Failed to grab old jobs!");
 
@@ -176,7 +176,7 @@ pub async fn old_jobs_daemon (
             )).await;
             continue;
         };
-        info!("[ Old jobs pulled! ]");
+        info!("Old jobs pulled!");
 
         tokio::time::sleep(tokio::time::Duration::from_secs(
             old_job_period
@@ -194,7 +194,7 @@ async fn grab_jobs_helper (
         &username,
         &hostname,
         "jobstat",
-        vec!["-anL"],
+        vec!("-anL"),
         true
     ).await
         .context("Failed to run remote command!")?
@@ -230,12 +230,12 @@ async fn grab_jobs_helper (
     }
     
     *app.status.write().await = Some(crate::routes::ClusterStatus {
-        total_nodes: node_stats[2].parse::<u32>()?,
-        used_nodes: node_stats[0].parse::<u32>()?,
-        total_cpus: cpu_stats[2].parse::<u32>()?,
-        used_cpus: cpu_stats[0].parse::<u32>()?,
-        total_gpus: gpu_stats[2].parse::<u32>()?,
-        used_gpus: gpu_stats[0].parse::<u32>()?
+        total_nodes: node_stats.get(2).context("Missing node field 2")?.parse::<u32>()?,
+        used_nodes: node_stats.get(0).context("Missing node field 0")?.parse::<u32>()?,
+        total_cpus: cpu_stats.get(2).context("Missing cpu field 2")?.parse::<u32>()?,
+        used_cpus: cpu_stats.get(0).context("Missing cpu field 0")?.parse::<u32>()?,
+        total_gpus: gpu_stats.get(2).context("Missing gpu field 2")?.parse::<u32>()?,
+        used_gpus: gpu_stats.get(0).context("Missing gpu field 0")?.parse::<u32>()?,
     });
 
     let job_strs: Vec<&str> = jobstat_output.split("--------------------\n")
@@ -282,13 +282,13 @@ pub async fn jobs_daemon ( app: Arc<AppState> ) -> ! {
         .unwrap_or_else(|_| DEFAULT_JOBSTAT_PERIOD.to_string())
         .parse::<u64>()
         .expect("Invalid `JOBS_DAEMON_PERIOD` value!");
-    info!("[ Jobstat period: {jobstat_period} ]");
+    info!("Jobstat period: {jobstat_period}");
 
     // Wait for the web server to start up
     tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     
     loop {
-        info!("[ Pulling jobs... ]");
+        info!("Pulling jobs...");
         if let Err(e) = grab_jobs_helper( app.clone() ).await {
             error!(%e, "Failed to run remote command!");
 
@@ -297,7 +297,7 @@ pub async fn jobs_daemon ( app: Arc<AppState> ) -> ! {
             )).await;
             continue;
         };
-        info!("[ Jobs pulled! ]");
+        info!("Jobs pulled!");
 
         tokio::time::sleep(tokio::time::Duration::from_secs(
             jobstat_period
