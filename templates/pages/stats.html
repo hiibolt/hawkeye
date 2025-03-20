@@ -4,9 +4,6 @@
     <div class="nav-item">
         <h2>Stats</h2>
     </div>
-    <div class="nav-item">
-        <p>This page is a wrapper around running <code>jobstat -anL</code> over time, which creates a detailed historical profile of a particular job on Metis.</p>
-    </div>
     {% match username %}
         {% when None %}
             <div class="nav-item">
@@ -26,9 +23,9 @@
       
             <div class="job-header">
                 <p>
-                    <b>{{ job["name"] }} - {{ job["pbs_id"] }} ({% if job["state"] == "E" %}{{ job["state"] }} - Exit Status: '{{ job["exit_status"] }}'{% else %}{{ job["state"] }}{% endif %})</b>
+                    <b>Job ID: {{ job["pbs_id"] }}, Job Name: {{ job["name"] }} ({{ job["state"] }}), PBS Requirements: nchunks{{ job["req_select"] }}</b>
                     <br>
-                    Submitted by <a href="{{ url_prefix }}/completed?user={{ job["owner"] }}">{{ job["owner"] }}</a>{% if job["start_time"] != "2147483647" %} on <b>{{ job["start_time"] }}</b>{% endif %}
+                    Submitted by <a href="{{ url_prefix }}/completed?user={{ job["owner"] }}">{{ job["owner"] }}</a> ({{ job["project"] }}) {% if job["start_time"] != "2147483647" %} on <b>{{ job["start_time"] }}</b>{% endif %}
                 </p>
             </div>
             <table class="job-table">

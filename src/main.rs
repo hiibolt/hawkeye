@@ -23,7 +23,7 @@ use tracing_subscriber;
 #[tokio::main]
 async fn main() -> ! {
     // Initialize the logger
-    let file_appender = tracing_appender::rolling::hourly("./logs", "daily.log");
+    let file_appender = tracing_appender::rolling::daily("./logs", "daily.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
     tracing_subscriber::fmt()
         .compact()
