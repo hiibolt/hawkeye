@@ -111,8 +111,8 @@ pub async fn grab_old_jobs_thread (
     
     for job in jobs.iter() {
         app.db
-            .lock().await
             .insert_job(job)
+            .await
             .with_context(|| format!("Couldn't insert job {job:?}!"))?;
     }
 
@@ -125,8 +125,8 @@ async fn grab_old_jobs_helper (
     // Get a list of all users from the DB
     let users = app
         .db
-        .lock().await
         .get_users()
+        .await
         .context("Couldn't get users!")?;
 
     let remote_username = app.remote_username.clone();
@@ -262,16 +262,16 @@ async fn grab_jobs_helper (
 
     for job in jobs.iter() {
         app.db
-            .lock().await
             .insert_job(job)
+            .await
             .with_context(|| "Couldn't insert job {job:?}!")?;
     }
 
     // Mark jobs that are no longer active as 'S' (stopped)
     info!("Marking completed jobs...");
     app.db
-        .lock().await
         .mark_completed_jobs(&jobs)
+        .await
         .context("Couldn't mark complete jobs!")?;
     info!("Completed jobs marked!");
 

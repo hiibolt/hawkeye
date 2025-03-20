@@ -51,7 +51,6 @@ pub async fn running(
 
     // Get all running jobs
     let mut jobs = app.db
-        .lock().await
         .get_all_jobs(
             Some(vec!("R", "Q")),
             None,
@@ -59,6 +58,7 @@ pub async fn running(
             None,
             None
         )
+        .await
         .map_err(|e| {
             error!(%e, "Couldn't get all jobs!");
             (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get all jobs!".to_string())
@@ -66,8 +66,8 @@ pub async fn running(
     
     // Tweak data to be presentable and add tooltips for efficiencies
     let groups_cache = app.db
-        .lock().await
-        .get_groups_cache();
+        .get_groups_cache()
+        .await;
     let (table_entries, errors) = sort_build_parse(
         groups_cache,
         vec!(
@@ -108,7 +108,7 @@ pub async fn running(
         alert: errors,
         table_entries,
 
-        cluster_status: *app.status.read().await,
+        cluster_status: app.status.read().await.clone(),
         url_prefix,
 
         toolkit: Toolkit

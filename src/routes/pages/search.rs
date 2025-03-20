@@ -79,7 +79,6 @@ pub async fn search(
     let mut jobs = if let Some(_) = username {
         if any_filters {
             app.db
-                .lock().await
                 .get_all_jobs(
                     params.get("state")
                         .and_then(|st| Some(vec!(st.as_str()))),
@@ -88,6 +87,7 @@ pub async fn search(
                     params.get("name"),
                     Some(&timestamp_filter)
                 )
+                .await
                 .map_err(|e| {
                     error!(%e, "Couldn't get all jobs!");
                     (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get all jobs!".to_string())
@@ -101,8 +101,8 @@ pub async fn search(
 
     // Tweak data to be presentable and add tooltips for efficiencies
     let groups_cache = app.db
-        .lock().await
-        .get_groups_cache();
+        .get_groups_cache()
+        .await;
     let (table_entries, errors) = sort_build_parse(
         groups_cache,
         vec!(

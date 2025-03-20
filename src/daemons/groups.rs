@@ -34,8 +34,8 @@ pub async fn grab_group_thread (
     info!("Got groups for `{user}`: {groups:?}");
 
     app.db
-        .lock().await
         .insert_user_groups(&user, groups)
+        .await
         .context("Couldn't insert user groups!")?;
     
     info!("Inserted groups for `{user}`!");
@@ -46,8 +46,8 @@ pub async fn grab_group_thread (
 async fn grab_groups_helper ( app: Arc<AppState> ) -> Result<()> {
     // Get a list of all users from the DB
     let users = app.db
-        .lock().await
         .get_users()
+        .await
         .context("Couldn't get users!")?;
 
     info!("[ Got Users ]: {users:?}");

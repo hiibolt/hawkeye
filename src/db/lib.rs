@@ -1,16 +1,17 @@
 use std::{collections::{BTreeMap, HashMap, HashSet}, time::{SystemTime, UNIX_EPOCH}};
-use chrono::{DateTime, Utc};
 
+use chrono::{DateTime, Utc};
 use anyhow::{Context, Result, anyhow};
 use rusqlite::{params, params_from_iter, Connection};
 use tracing::{info, error};
+use tokio::sync::Mutex;
 
 use super::super::remote::auth::verify_login;
 
 #[derive(Debug)]
 pub struct DB {
-    conn: Connection,
-    groups_cache: HashMap<String, HashSet<String>>
+    conn: Mutex<Connection>,
+    groups_cache: Mutex<HashMap<String, HashSet<String>>>
 }
 pub struct LoginResult {
     pub success: bool,
@@ -92,18 +93,23 @@ impl DB {
         )?;
         
         Ok(Self {
-            conn,
-            groups_cache: HashMap::new()
+            conn: Mutex::new(conn),
+            groups_cache: Mutex::new(HashMap::new())
         })
     }
-    pub fn insert_job ( &mut self, job: &BTreeMap<&str, String> ) -> Result<()> {
-        self.conn.execute(
+    pub async fn insert_job (
+        &self,
+        job: &BTreeMap<&str, String>
+    ) -> Result<()> {
+        let conn = self.conn.lock().await;
+
+        conn.execute(
             "INSERT OR IGNORE INTO Users (name) VALUES (?1)",
             [&job.get("Job_Owner").context("Missing job owner")?],
         )?;
         
         // Add the job
-        self.conn.execute(
+        conn.execute(
             "INSERT OR REPLACE INTO Jobs (pbs_id, name, owner, state, start_time, queue, nodes, req_mem, req_cpus, req_gpus, req_walltime, req_select, mem_efficiency, walltime_efficiency, cpu_efficiency, used_cpu_percent, used_mem, used_walltime, end_time, chunks, exit_status, est_start_time, used_cpu_time) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
             params![
                 job.get("job_id").context("Missing job ID")?,
@@ -139,7 +145,7 @@ impl DB {
             .context("Time went backwards")?;
         let datetime = DateTime::<Utc>::from(UNIX_EPOCH + duration_since_epoch);
         let formatted_datetime = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
-        self.conn.execute(
+        conn.execute(
             "INSERT INTO PastStats (pbs_id, cpu_percent, mem, datetime) VALUES (?1, ?2, ?3, ?4)",
             params![
                 job.get("job_id").context("Missing job ID")?,
@@ -152,17 +158,17 @@ impl DB {
         Ok(())
     }
 
-    pub fn get_groups_cache (
+    pub async fn get_groups_cache (
         &self
     ) -> HashMap<String, HashSet<String>> {
-        return self.groups_cache.clone();
+        return self.groups_cache.lock().await.clone();
     }
-    pub fn insert_user_groups (
-        &mut self,
+    pub async fn insert_user_groups (
+        &self,
         user: &str,
         groups: Vec<&str>
     ) -> Result<()> {
-        self.groups_cache.insert(
+        self.groups_cache.lock().await.insert(
             user.to_string(),
             groups.iter()
                 .map(|&st| st.to_string())
@@ -171,21 +177,24 @@ impl DB {
 
         for group in groups {
             self.insert_user_group(&user, group)
+                .await
                 .with_context(|| format!("Couldn't insert user {user} into group {group}!"))?;
         }
 
         Ok(())
     }
-    pub fn insert_user_group (
-        &mut self,
+    pub async fn insert_user_group (
+        &self,
         user: &str,
         group: &str,
     ) -> Result<()> {
-        self.conn.execute(
+        let conn = self.conn.lock().await;
+
+        conn.execute(
             "INSERT OR IGNORE INTO Groups (name) VALUES (?1)",
             [group],
         )?;
-        self.conn.execute(
+        conn.execute(
             "INSERT OR IGNORE INTO UserGroups (user_name, group_name) VALUES (?1, ?2)",
             [user, group],
         )?;
@@ -196,10 +205,12 @@ impl DB {
     /// Update all jobs in state 'R' that are *not* in the current list of active jobs.
     /// We mark them as 'S' in the database (i.e., 'stopped' or 'completed').
     #[tracing::instrument]
-    pub fn mark_completed_jobs(
-        &mut self,
+    pub async fn mark_completed_jobs(
+        &self,
         active_jobs: &[BTreeMap<&str, String>],
     ) -> Result<()> {
+        let conn = self.conn.lock().await;
+
         // Build a set of IDs for *currently active* jobs
         let active_ids: HashSet<_> = active_jobs
             .iter()
@@ -207,7 +218,7 @@ impl DB {
             .collect();
         
         // Find all jobs that are in state 'R' in our local DB
-        let mut stmt = self.conn.prepare("SELECT pbs_id FROM Jobs WHERE state = 'R'")?;
+        let mut stmt = conn.prepare("SELECT pbs_id FROM Jobs WHERE state = 'R'")?;
         let rows = stmt.query_map([], |row| row.get::<_, i32>(0))?;
     
         // For each job in state 'R', check if it's still active
@@ -222,12 +233,12 @@ impl DB {
                     .context("Time went backwards")?
                     .as_secs();
 
-                self.conn.execute(
+                conn.execute(
                     "UPDATE Jobs SET state = 'E' WHERE pbs_id = ?1",
                     [pbs_id],
                 )?;
 
-                self.conn.execute(
+                conn.execute(
                     "UPDATE Jobs SET end_time = ?1 WHERE pbs_id = ?2",
                     [secs_since_epoch.to_string(), pbs_id.to_string()],
                 )?;
@@ -238,8 +249,8 @@ impl DB {
     }
 
     #[tracing::instrument]
-    pub fn get_user_jobs(
-        &mut self,
+    pub async fn get_user_jobs(
+        &self,
         username: &str,
         filter_state: Option<&String>,
         filter_queue: Option<&String>,
@@ -247,6 +258,8 @@ impl DB {
         filter_name: Option<&String>,
         filter_date: Option<&String>
     ) -> Result<Vec<BTreeMap<String, String>>> {
+        let conn = self.conn.lock().await;
+
         let mut additional_filters= String::new();
         let mut params = vec![username.to_string()];
         if let Some(filter_state) = filter_state {
@@ -273,7 +286,7 @@ impl DB {
             params.push(filter_date.to_owned());
         }
 
-        let mut stmt = self.conn.prepare(&format!("SELECT * FROM Jobs WHERE owner = ?1{}", additional_filters))?;
+        let mut stmt = conn.prepare(&format!("SELECT * FROM Jobs WHERE owner = ?1{}", additional_filters))?;
         let rows = stmt.query_map(params_from_iter(params), |row| {
             Ok(BTreeMap::from_iter(vec![
                 ("pbs_id".to_string(), row.get::<_, i32>(0)?.to_string()),
@@ -306,14 +319,16 @@ impl DB {
     }
 
     #[tracing::instrument]
-    pub fn get_all_jobs (
-        &mut self,
+    pub async fn get_all_jobs (
+        &self,
         filter_states: Option<Vec<&str>>,
         filter_queue: Option<&String>,
         filter_owner: Option<&String>,
         filter_name: Option<&String>,
         filter_date: Option<&String>
     ) -> Result<Vec<BTreeMap<String, String>>> {
+        let conn = self.conn.lock().await;
+
         let mut additional_filters= String::new();
         let mut params = vec![];
         if let Some(filter_state) = filter_states {
@@ -370,7 +385,7 @@ impl DB {
         let final_query = format!("SELECT * FROM Jobs{}", additional_filters);
 
         //  ORDER BY start_time DESC
-        let mut stmt = self.conn.prepare(&final_query)?;
+        let mut stmt = conn.prepare(&final_query)?;
         let rows = stmt.query_map(params_from_iter(params), |row| {
             Ok(BTreeMap::from_iter(vec![
                 ("pbs_id".to_string(), row.get::<_, i32>(0)?.to_string()),
@@ -412,8 +427,8 @@ impl DB {
     }
 
     #[tracing::instrument]
-    pub fn _get_group_jobs (
-        &mut self,
+    pub async fn _get_group_jobs (
+        &self,
         filter_state: Option<&String>,
         filter_queue: Option<&String>,
         filter_owner: Option<&String>,
@@ -421,6 +436,8 @@ impl DB {
         filter_date: Option<&String>,
         group: &str
     ) -> Result<Vec<BTreeMap<String, String>>> {
+        let conn = self.conn.lock().await;
+        
         let mut additional_filters= String::new();
         let mut params: Vec<String> = vec![group.to_string()];
         if let Some(filter_state) = filter_state {
@@ -451,7 +468,7 @@ impl DB {
         info!("Additional filters: '{additional_filters}'");
         info!("Params: {params:?}");
 
-        let mut stmt = self.conn.prepare(&format!("SELECT * FROM Jobs WHERE owner IN (SELECT user_name FROM UserGroups WHERE group_name = ?1){}", additional_filters))?;
+        let mut stmt = conn.prepare(&format!("SELECT * FROM Jobs WHERE owner IN (SELECT user_name FROM UserGroups WHERE group_name = ?1){}", additional_filters))?;
         let rows = stmt.query_map(params_from_iter(params), |row| {
             Ok(BTreeMap::from_iter(vec![
                 ("pbs_id".to_string(), row.get::<_, i32>(0)?.to_string()),
@@ -493,11 +510,13 @@ impl DB {
         }
     }
 
-    pub fn get_job (
-        &mut self,
+    pub async fn get_job (
+        &self,
         pbs_id: i32,
     ) -> Result<BTreeMap<String, String>> {
-        let mut stmt = self.conn.prepare("SELECT * FROM Jobs WHERE pbs_id = ?1")?;
+        let conn = self.conn.lock().await;
+
+        let mut stmt = conn.prepare("SELECT * FROM Jobs WHERE pbs_id = ?1")?;
         let row = stmt.query_row([pbs_id], |row| {
             Ok(BTreeMap::from_iter(vec![
                 ("pbs_id".to_string(), row.get::<_, i32>(0)?.to_string()),
@@ -529,11 +548,14 @@ impl DB {
         Ok(row)
     }
 
-    pub fn get_job_stats (
-        &mut self,
+    pub async fn get_job_stats (
+        &self,
         pbs_id: i32,
     ) -> Result<Vec<BTreeMap<String, String>>> {
-        let mut stmt = self.conn.prepare("SELECT * FROM PastStats WHERE pbs_id = ?1")?;
+        let conn = self.conn.lock().await;
+        
+
+        let mut stmt = conn.prepare("SELECT * FROM PastStats WHERE pbs_id = ?1")?;
         let rows = stmt.query_map([pbs_id], |row| {
             Ok(BTreeMap::from_iter(vec![
                 ("stat_id".to_string(), row.get::<_, i32>(0)?.to_string()),
@@ -547,71 +569,82 @@ impl DB {
         Ok(rows.flatten().collect())
     }
 
-    pub fn get_users (
-        &mut self,
+    pub async fn get_users (
+        &self,
     ) -> Result<Vec<String>> {
-        let mut stmt = self.conn.prepare("SELECT name FROM Users")?;
+        let conn = self.conn.lock().await;
+        
+
+        let mut stmt = conn.prepare("SELECT name FROM Users")?;
         let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
     
         Ok(rows.flatten().collect())
     }
     
-    pub fn _get_user_groups (
-        &mut self,
+    pub async fn _get_user_groups (
+        &self,
         username: &str,
     ) -> Result<Vec<String>> {
-        let mut stmt = self.conn.prepare("SELECT group_name FROM UserGroups WHERE user_name = ?1")?;
+        let conn = self.conn.lock().await;
+        
+
+        let mut stmt = conn.prepare("SELECT group_name FROM UserGroups WHERE user_name = ?1")?;
         let rows = stmt.query_map([username], |row| row.get::<_, String>(0))?;
     
         Ok(rows.flatten().collect())
     }
 
-    pub fn _is_user_able_to_view_stats (
-        &mut self,
+    pub async fn _is_user_able_to_view_stats (
+        &self,
         user: &str,
         pbs_id: i32,
     ) -> Result<bool> {
+        let conn = self.conn.lock().await;
+
         // Firstly, if the user is in the `hpc` group,
         //  they are allowed to view advanced stats for
         //  any job.
-        if self._is_user_admin(user)? {
+        if self._is_user_admin(user).await? {
             return Ok(true);
         }
 
         // Note that a user is also allowed to view advanced 
         //  stats if the job was created by another user in
         //  the same group as the current user.
-        let mut stmt = self.conn.prepare("SELECT COUNT(*) FROM Jobs WHERE pbs_id = ?1 AND (owner = ?2 OR owner IN (SELECT user_name FROM UserGroups WHERE group_name IN (SELECT group_name FROM UserGroups WHERE user_name = ?2)))")?;
+        let mut stmt = conn.prepare("SELECT COUNT(*) FROM Jobs WHERE pbs_id = ?1 AND (owner = ?2 OR owner IN (SELECT user_name FROM UserGroups WHERE group_name IN (SELECT group_name FROM UserGroups WHERE user_name = ?2)))")?;
         let count: i32 = stmt.query_row([pbs_id.to_string(), user.to_string()], |row| row.get(0))?;
 
         Ok(count > 0)
     }
 
-    pub fn _is_user_in_group (
-        &mut self,
+    pub async fn _is_user_in_group (
+        &self,
         user: &str,
         group: &str,
     ) -> Result<bool> {
-        let mut stmt = self.conn.prepare("SELECT COUNT(*) FROM UserGroups WHERE user_name = ?1 AND group_name = ?2")?;
+        let conn = self.conn.lock().await;
+
+        let mut stmt = conn.prepare("SELECT COUNT(*) FROM UserGroups WHERE user_name = ?1 AND group_name = ?2")?;
         let count: i32 = stmt.query_row([user, group], |row| row.get(0))?;
     
         Ok(count > 0)
     }
 
-    pub fn _is_user_admin (
-        &mut self,
+    pub async fn _is_user_admin (
+        &self,
         user: &str,
     ) -> Result<bool> {
-        self._is_user_in_group(user, "hpc")
+        self._is_user_in_group(user, "hpc").await
     }
 
     pub async fn login (
-        &mut self,
+        &self,
         remote_username: &str,
         remote_hostname: &str,
         username: &str,
         password: &str
     ) -> Result<LoginResult> {
+        let conn = self.conn.lock().await;
 
         match verify_login(
             remote_username,
@@ -624,14 +657,14 @@ impl DB {
         {
             true => {
                 // Check if the user exists in the DB
-                let mut stmt = self.conn.prepare("SELECT COUNT(*) FROM Users WHERE name = ?1")?;
+                let mut stmt = conn.prepare("SELECT COUNT(*) FROM Users WHERE name = ?1")?;
                 let count: i32 = stmt.query_row([username], |row| row.get(0))?;
                 drop(stmt);
 
                 // If the user doesn't exist, add them and
                 //  populate their groups
                 if count == 0 {
-                    self.conn.execute(
+                    conn.execute(
                         "INSERT INTO Users (name) VALUES (?1)",
                         [username],
                     )?;

@@ -32,7 +32,6 @@ pub async fn login (
 
     let login_result = app
         .db
-        .lock().await
         .login(
             &remote_username,
             &remote_hostname,

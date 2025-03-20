@@ -6,8 +6,11 @@ edition = "2021"
 [profile.dev.package.askama_derive]
 opt-level = 3
 
+[profile.release]
+debug = true
+
 [dependencies]
-anyhow = "1.0.95"
+anyhow = { version = "1.0.95", features = [ "backtrace" ] }
 askama = { version = "0.12.1", features = [ "serde-json" ] }
 axum = "0.8.1"
 chrono = "0.4.39"
@@ -18,4 +21,5 @@ serde = "1.0.217"
 tokio = { version = "1", features = [ "rt", "net", "rt-multi-thread", "fs" ] }
 tower-sessions = { version = "0.14.0", features = [ "private" ] }
 tracing = "0.1.41"
+tracing-appender = "0.2.3"
 tracing-subscriber = { version = "0.3.19", features = [ "env-filter" ] }

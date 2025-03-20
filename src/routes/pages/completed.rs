@@ -73,7 +73,6 @@ pub async fn completed(
     // Get the jobs
     let mut jobs = if let Some(_) = username {    
         app.db
-            .lock().await
             .get_user_jobs(
                 &user_query.clone().expect("Unreachable"),
                 Some(&"E".to_string()),
@@ -82,6 +81,7 @@ pub async fn completed(
                 None, 
                 Some(&timestamp_filter)
             )
+            .await
             .map_err(|e| {
                 error!(%e, "Couldn't get all jobs!");
                 (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get all jobs!".to_string())
@@ -92,8 +92,8 @@ pub async fn completed(
 
     // Tweak data to be presentable and add tooltips for efficiencies
     let groups_cache = app.db
-        .lock().await
-        .get_groups_cache();
+        .get_groups_cache()
+        .await;
     let (table_entries, errors) = sort_build_parse(
         groups_cache,
         vec!(

@@ -60,15 +60,15 @@ pub async fn stats(
                 })?;
 
             let mut job = app.db
-                .lock().await
                 .get_job(id)
+                .await
                 .map_err(|e| {
                     error!(%e, "Couldn't get job!");
                     (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get job!".to_string())
                 })?;
             let stats = app.db
-                .lock().await
                 .get_job_stats(id)
+                .await
                 .map_err(|e| {
                     error!(%e, "Couldn't get job stats!");
                     (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't get job stats!".to_string())

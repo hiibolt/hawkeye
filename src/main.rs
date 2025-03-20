@@ -11,7 +11,7 @@ use routes::AppState;
 
 use std::sync::Arc;
 
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use axum::{
     routing::{get, post}, Router
 };
@@ -23,14 +23,35 @@ use tracing_subscriber;
 #[tokio::main]
 async fn main() -> ! {
     // Initialize the logger
+    let file_appender = tracing_appender::rolling::hourly("./logs", "daily.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
     tracing_subscriber::fmt()
         .compact()
+        .with_writer(non_blocking)
         .with_file(true)
         .with_line_number(true)
         .with_thread_ids(true)
         .with_target(false)
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
+
+    // Write panics to `./logs/panic.log-<timestamp>`
+    std::panic::set_hook(Box::new(|panic| {
+        let panic_info = format!("{}", panic);
+
+        // Create the filename
+        let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
+        let filename = format!("./logs/panic.log-{}", timestamp);
+
+        // Print the filename to stderr
+        eprintln!("[ Panic info written to `{}` ]", filename);
+        eprintln!("[ Please report this to the developers! ]");
+        eprintln!("[ Full panic info: ]\n{}", panic_info);
+
+        // Write the panic info to the file
+        std::fs::write(&filename, panic_info)
+            .expect("Failed to write panic info to file!");
+    }));
 
     // Create the shared state
     let url_prefix = std::env::var("URL_PREFIX")
@@ -40,10 +61,10 @@ async fn main() -> ! {
             .expect("Missing `REMOTE_USERNAME` environment variable!"),
         remote_hostname: std::env::var("REMOTE_HOSTNAME")
             .expect("Missing `REMOTE_HOSTNAME` environment variable!"),
-        db: Mutex::new(DB::new(
+        db: DB::new(
             &std::env::var("DB_PATH")
                 .expect("Missing `DB_PATH` environment variable!")
-        ).expect("Failed to establish connection to DB!")),
+        ).expect("Failed to establish connection to DB!"),
         url_prefix: url_prefix.clone(),
 
         status: RwLock::new(None)
