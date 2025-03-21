@@ -28,13 +28,14 @@ enum TableStat {
     JobOwner,
     JobName(usize),
     JobProject,
+    Queue,
     Status,
     StartTime,
     EndTime,
     CpuTime,
     UsedMemPerCore,
     UsedMem,
-    Queue,
+    UsedOverRsvdMem,
     RsvdTime,
     RsvdCpus,
     RsvdGpus,
@@ -74,7 +75,7 @@ impl TableStat {
                         .into_iter()
                         .next()
                         .and_then(|st| Some(st.to_owned()))
-                        .unwrap_or(String::from("None"))
+                        .unwrap_or(String::from("no project"))
                 );
             }
             TableStat::StartTime => {
@@ -109,7 +110,20 @@ impl TableStat {
                             .unwrap_or(1f32) )
                     )
                 );
-            }
+            },
+            TableStat::UsedOverRsvdMem => {
+                job.insert(
+                    String::from("used_over_rsvd_mem"),
+                    format!("{:.2}/{:.2}",
+                        job.get("used_mem")
+                            .and_then(|st| st.parse::<f32>().ok())
+                            .unwrap_or(0f32),
+                        job.get("req_mem")
+                            .and_then(|st| st.parse::<f32>().ok())
+                            .unwrap_or(0f32)
+                    )
+                );
+            },
             TableStat::NodesChunks => {
                 job.insert(
                     String::from("nodes/chunks"),
@@ -119,7 +133,7 @@ impl TableStat {
                         job.get("chunks").unwrap_or(&"0".to_string())
                     )
                 );
-            }
+            },
             TableStat::RsvdGpus => {
                 if job.get("req_gpus").is_none() {
                     job.insert(String::from("req_gpus"), String::from("0"));
@@ -239,6 +253,14 @@ impl Into<TableEntry> for TableStat {
                 tooltip: String::from("<b>Used Memory</b><br><br>The total amount of memory used by the job, in GB"),
                 sort_by: Some(String::from("used_mem")),
                 value: String::from("used_mem"),
+                value_unit: Some(String::from("GB")),
+                stat_type: TableStatType::Default
+            },
+            TableStat::UsedOverRsvdMem => TableEntry {
+                name: String::from("Used/Rsvd Mem"),
+                tooltip: String::from("<b>Used/Reserved Memory</b><br><br>The total amount of memory used by the job versus the amount requested, in GB"),
+                sort_by: None,
+                value: String::from("used_over_rsvd_mem"),
                 value_unit: Some(String::from("GB")),
                 stat_type: TableStatType::Default
             },
@@ -362,7 +384,7 @@ struct TableEntry {
 
 // Field helper functions
 fn timestamp_field_to_date ( timestamp_field: &mut String ) {
-    let timestamp_i64 = timestamp_field.parse::<i64>().unwrap();
+    let timestamp_i64 = timestamp_field.parse::<i64>().unwrap_or(0);
     *timestamp_field = if let Some(date_time) = chrono::DateTime::from_timestamp(timestamp_i64, 0) {
         date_time.with_timezone(&chrono::Local)
             .format("%b %e, %Y at %l:%M%p")
@@ -547,7 +569,7 @@ fn add_efficiency_tooltips ( job: &mut BTreeMap<String, String> ) {
         format!("<b>CPU Efficiency: {cpu_efficiency:.2}%</b>")
         + "<br><br>"
         + match cpu_efficiency {
-            x if x < 50f32 => "The job has a low CPU load, consider reserving fewer CPUs.",
+            x if x < 50f32 => "The job had a low CPU load, consider reserving fewer CPUs.",
             x if x < 75f32 => "The job is using the CPU somewhat efficiently.",
             x if x >= 75f32 => "The job is using the CPU very efficiently!",
             _ => "Abnormal CPU usage!"
@@ -560,7 +582,7 @@ fn add_efficiency_tooltips ( job: &mut BTreeMap<String, String> ) {
         format!("<b>Memory Efficiency: {mem_efficiency:.2}%</b>")
         + "<br><br>"
         + match mem_efficiency {
-            x if x < 50f32 => "The job has low memory utilization, consider reserving less memory. If using a GPU, this is likely okay.",
+            x if x < 50f32 => "The job had low memory utilization; consider reserving less memory.",
             x if x < 75f32 => "The job is using the memory somewhat efficiently. If you are using a GPU, this is okay.",
             x if x >= 75f32 => "The job is using the memory very efficiently!",
             _ => "Abnormal memory usage!"
@@ -573,13 +595,13 @@ fn add_efficiency_tooltips ( job: &mut BTreeMap<String, String> ) {
         format!("<b>Walltime Efficiency: {walltime_efficiency:.2}%</b>") 
         + "<br><br>"
         + match walltime_efficiency {
-            x if x < 50f32 => "The job didn't use most of its walltime, consider using less walltime to help queue times.",
+            x if x < 50f32 => "The job took significantly less time than requested; please consider decreasing the requirement. The accurate estimation of the walltime needed is essential for the job starting time and will allow a better schedule of maintenance tasks.",
             x if x < 80f32 => "The job is using the walltime efficiently.",
             x if x >= 80f32 => "The job is potentially using too much walltime, consider allocating more for breathing room to avoid having the job killed.",
             _ => "Abnormal walltime usage!"
         }
         + "<br><br>"
-        + "See the bottom of the <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#jobcontrol\">CRCD docs</a> for more."
+        + "See the <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#jobcontrol\">CRCD docs</a> for more."
     );
 }
 fn signal_to_str_suffix ( 

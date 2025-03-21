@@ -14,6 +14,15 @@
 {% endblock %}
 
 {% block jobs %}
+    <style>
+        .stat-container {
+            border-radius: 5px;
+            margin-bottom: 5px; /* Space below the header */
+            border: 1px solid #ccc;
+            text-align: center; /* Center text */
+            padding: 10px;
+        }
+    </style>
     {% match username %}
     {% when Some with (username) %}
         {% match job %}
@@ -23,85 +32,176 @@
       
             <div class="job-header">
                 <p>
-                    <b>Job ID: {{ job["pbs_id"] }}, Job Name: {{ job["name"] }} ({{ job["state"] }}), PBS Requirements: nchunks{{ job["req_select"] }}</b>
+                    <b>Job ID</b>: {{ job["pbs_id"] }}, <b>Job Name</b>: {{ job["name"] }} ({{ job["state"] }}), <b>PBS Requirements</b>: nchunks{{ job["req_select"] }}
                     <br>
-                    Submitted by <a href="{{ url_prefix }}/completed?user={{ job["owner"] }}">{{ job["owner"] }}</a> ({{ job["project"] }}) {% if job["start_time"] != "2147483647" %} on <b>{{ job["start_time"] }}</b>{% endif %}
+                    <b>Submitted by</b> <a href="{{ url_prefix }}/completed?user={{ job["owner"] }}">{{ job["owner"] }}</a> ({{ job["project"] }}) {% if job["start_time"] != "2147483647" %} <b>on</b> {{ job["start_time"] }}{% endif %}
                 </p>
-            </div>
-            <table class="job-table">
-                <thead>
-                    <tr>
-                        <th>Queue</th>
-                        <th>Walltime</th>
-                        <th># of CPUs</th>
-                        <th># of GPUs</th>
-                        <th>Memory</th>
-                        <th>End Time</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>{{ job["queue"] }}</td>
-                        <td>{{ job["req_walltime"] }}</td>
-                        <td>{{ job["req_cpus"] }}</td>
-                        {% match job.get("req_gpus") %}
-                        {% when Some with (req_gpus) %}
-                            <td>{{ req_gpus }}</td>
-                        {% when None %}
-                            <td>0</td>
-                        {% endmatch %}
-                        <td>{{ job["req_mem"] }}GB</td>
-                        {% if job["end_time"] == "2147483647" %}
-                            <td>Not Ended</td>
-                        {% else %}
-                            <td>{{ job["end_time"] }}</td>
-                        {% endif %}
-                    </tr>
-                </tbody>
-                <thead>
-                    <tr>
-                        <th>Chunks</th>
-                        <th>Used CPU</th>
-                        <th>Used Mem</th>
-                        <th>Used Mem/CPU</th>
-                        <th>Used/Req Mem</th>
-                        <th>Used Walltime</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>{{ job["chunks"] }}</td>
-                        <td>{{ job["used_cpu_percent"] }}%</td>
-                        <td>{{ job["used_mem"] }}GB</td>
-                        {% match toolkit.div_two_i32s_into_f32(job["used_mem"], job["req_cpus"]) %}
-                        {% when Ok with (used_mem_per_cpu) %}
-                            <td>{{ used_mem_per_cpu }}GB</td>
-                        {% when Err with (_) %}
-                            <td>NaN</td>
-                        {% endmatch %}
-                        {% match toolkit.div_two_i32s_into_f32(job["used_mem"], job["req_mem"]) %}
-                        {% when Ok with (used_mem_per_req) %}
-                            <td>{{ used_mem_per_req }}</td>
-                        {% when Err with (_) %}
-                            <td>NaN</td>
-                        {% endmatch %}
-                        <td>{{ job["used_walltime"] }}</td>
-                    </tr>
-                </tbody>
-            </table>
-            <div class="job-nodes">
                 <p>
-                    <b>Nodes</b>
+                    <b>Running on Nodes: </b>
                     <br>
                     {{ job["nodes"] }}
                 </p>
-                <p>
-                    <b>PBS Selection</b>
-                    <br>
-                    {{ job["req_select"] }}
-                </p>
             </div>
-            <div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;grid-gap:20px;">
+                {% for (name, table_entries) in tables %}
+                <div class="stat-container">
+                    <h3>{{ name }}</h3>
+                    <table class="job-table">
+                        <tr>
+                            <!--
+                                Do not remove. Not sure why, but removing this
+                                breaks the popover functionality.
+                            -->
+                        </tr>
+                        <tr>
+                            {% for table_entry in table_entries %}
+                                <th class="popover__wrapper">
+                                    {% match table_entry.sort_by %}
+                                    {% when None %}
+                                        {{ table_entry.name }}
+                                    {% when Some with (sortable) %}
+                                    <!-- Black text -->
+                                    <a href="#" id="{{ table_entry.name }}"
+                                        style="color: black;"
+                                    >{{ table_entry.name }}
+                                    </a>
+                                    <script>
+                                        document.getElementById("{{ table_entry.name }}").addEventListener("click", function(event) {
+                                            event.preventDefault(); // Prevent default link behavior
+                                
+                                            // The sort parameter you want to add
+                                            const sortText = "{{ sortable }}"; // This could be dynamic, based on your specific sorting logic
+                                
+                                            // Get the current URL
+                                            const currentUrl = window.location.href;
+                                
+                                            // Create a URL object to easily manipulate the query parameters
+                                            const url = new URL(currentUrl);
+                                
+                                            // Set the sort parameter
+                                            url.searchParams.set("sort", sortText);
+                                
+                                            // Toggle the 'reverse' parameter: if it's already true, remove it; otherwise, set it to true
+                                            if (url.searchParams.has("reverse")) {
+                                                // If reverse is already set, toggle it off
+                                                url.searchParams.delete("reverse");
+                                            } else {
+                                                // If reverse isn't set, add it
+                                                url.searchParams.set("reverse", "true");
+                                            }
+                                
+                                            // Redirect to the new URL with the updated query string
+                                            window.location.href = url.toString();
+                                        });
+                                    </script>
+                                    {% endmatch %}
+                                    <div class="popover__content" style="font-weight:normal;">
+                                        {{ table_entry.tooltip|as_ref|escape("none") }}
+                                    </div>
+                                </th>
+                            {% endfor %}
+                        </tr>
+                        <tr>
+                            {% for table_entry in table_entries %}
+                                {% match table_entry.stat_type %}
+                                {% when TableStatType::ExitStatus %}
+                                    <td 
+                                        {% if job["exit_status"] == "0" %}
+                                            style="background-color: rgba(0, 255, 0, 0.5);"
+                                        {% else %}
+                                            style="background-color: rgba(255, 255, 0, 0.5);"
+                                        {% endif %}
+                                        class="popover__wrapper"
+                                    >
+                                        <div class="popover__content">
+                                            {{ toolkit.get_field(job, "exit_status_tooltip")?|escape("none") }}
+                                        </div>
+                                        {{ toolkit.get_field(job, "exit_status")? }} ⓘ
+                                    </td>
+                                {% when TableStatType::More %}
+                                    <td>
+                                        <a href="{{ url_prefix }}/stats?id={{ toolkit.get_field(job, "pbs_id")? }}">
+                                            <button class="table-button">View Detailed Stats</button>
+                                        </a>
+                                    </td>
+                                {% when TableStatType::JobID %}
+                                    <td>
+                                        <b>{{ toolkit.get_field(job, "pbs_id")? }}</b>
+                                    </td>
+                                {% when TableStatType::JobOwner %}
+                                    <td>
+                                        <a href="{{ url_prefix }}/completed?user={{ toolkit.get_field(job, "owner")? }}">{{ toolkit.get_field(job, "owner")? }}</a>
+                                    </td>
+                                {% when TableStatType::JobName with (len) %}
+                                    {% if toolkit.get_field(job, "name")?.len()|as_ref > len %}
+                                        <td class="popover__wrapper">
+                                            <p>
+                                                {{ toolkit.shorten(toolkit.get_field(job, "name")?|as_ref, len) }}ⓘ
+                                            </p>
+                                            <div class="popover__content">
+                                                <p class="popover__message">
+                                                    <b>Full Job Name:</b><br>
+                                                    {{ toolkit.get_field(job, "name")? }}
+                                                </p>
+                                            </div>
+                                        </td>
+                                    {% else %}
+                                        <td>{{ toolkit.get_field(job, "name")? }}</td>
+                                    {% endif %}
+                                {% when TableStatType::ColoredRG %}
+                                    {% let eff = toolkit.get_field(job, table_entry.value|as_ref)? %}
+                                    {% match toolkit.to_i32(eff|as_ref) %}
+                                        {% when Ok with (eff) %}
+                                            <td
+                                                style="white-space: nowrap; background-color: rgba({{ 255-(255*eff)/100 }}, {{ (205*eff)/100 }}, 0, 0.5);"
+                                                class="popover__wrapper"
+                                            >
+                                                <div class="popover__content">
+                                                    {{ toolkit.get_field(job, (table_entry.value.clone() + "_tooltip")|as_ref)?|escape("none") }}
+                                                </div>
+                                                {{ eff }}% ⓘ
+                                            </td>
+                                        {% when Err with (_) %}
+                                            <td style="background-color: rgba(255, 255, 0, 0.5);">{{ eff }}%</td>
+                                    {% endmatch %}
+                                {% when TableStatType::ColoredYGR %}
+                                    {% let eff = toolkit.get_field(job, table_entry.value|as_ref)? %}
+                                    {% match toolkit.to_i32(eff|as_ref) %}
+                                        {% when Ok with (eff) %}
+                                            <td
+                                                style="background-color: rgba(
+                                                    {% if eff <= 80|as_ref %}
+                                                        {{ 255 - (255 * eff / 80) }}
+                                                    {% else %}
+                                                        {{ (255 * (eff - 80) / 20) }}
+                                                    {% endif %},
+                                                    {% if eff <= 80|as_ref %}
+                                                        205
+                                                    {% else %}
+                                                        {{ 205 * (100 - eff) / 20 }}
+                                                    {% endif %},
+                                                    0, 0.5
+                                                );"
+                                                class="popover__wrapper"
+                                            >
+                                                <div class="popover__content">
+                                                    {{ toolkit.get_field(job, (table_entry.value.clone() + "_tooltip")|as_ref)?|escape("none") }}
+                                                </div>
+                                                <p style="white-space: nowrap;">{{ eff }}% ⓘ</p>
+                                            </td>
+                                        {% when Err with (_) %}
+                                            <td style="background-color: rgba(255, 255, 0, 0.5);">{{ eff }}%</td>
+                                    {% endmatch %}
+                                {% when TableStatType::Default %}
+                                    <td>{{ toolkit.get_field(job, table_entry.value|as_ref)? }}{{ table_entry.value_unit.clone().unwrap_or(String::new()) }}</td>
+                                {% endmatch %}
+                            {% endfor %}
+                        </tr>
+                    </table>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="stat-container">
                 {% match toolkit.to_i32(job["cpu_efficiency"]) %}
                     {% when Ok with (eff) %}
                         {% let width_eff = 5+eff %}
@@ -160,8 +260,10 @@
                     {% when Err with (_) %}
                 {% endmatch %}
             </div>
-            <canvas id="cpuChart" width="400" height="200"></canvas>
-            <canvas id="memChart" width="400" height="200"></canvas>
+            <div class="stat-container">
+                <canvas id="cpuChart" width="400" height="200"></canvas>
+                <canvas id="memChart" width="400" height="200"></canvas>
+            </div>
             <script>
                 const stats_json = {{ stats|tojson|safe }};
                 const ctxCpu = document.getElementById('cpuChart').getContext('2d');

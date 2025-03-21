@@ -1,7 +1,7 @@
 use super::super::AppState;
-use super::{try_render_template, timestamp_field_to_date, Toolkit};
+use super::{timestamp_field_to_date, try_render_template, TableEntry, TableStat, TableStatType, Toolkit, sort_build_parse};
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::Result;
@@ -28,6 +28,7 @@ struct StatsPageTemplate<'a> {
         Vec<BTreeMap<String, String>>
     )>,
     jobs: Vec<BTreeMap<String, String>>,
+    tables: Vec<(String, Vec<TableEntry>)>,
     url_prefix: &'a str,
     
     toolkit: Toolkit
@@ -35,7 +36,7 @@ struct StatsPageTemplate<'a> {
 #[tracing::instrument]
 pub async fn stats(
     State(app): State<Arc<AppState>>,
-    Query(params): Query<BTreeMap<String, String>>,
+    Query(params): Query<HashMap<String, String>>,
     session: Session,
 ) -> Result<Response, (StatusCode, String)> {
     info!("[ Got request to build the stats page...]");
@@ -52,7 +53,10 @@ pub async fn stats(
         .and_then(|st| Some(st.to_owned()));
 
     // Get all running jobs
-    let mut job = if let Some(_) = username {
+    let mut job: Option<(
+        BTreeMap<String, String>,
+        Vec<BTreeMap<String, String>>
+    )> = if let Some(_) = username {
         if let Some(ref id) = id_query {
             let id = id.parse::<i32>()
                 .map_err(|e| {
@@ -103,7 +107,74 @@ pub async fn stats(
         .format("%b %e, %Y at %l:%M%p")
         .to_string();
 
+    let mut jobs = std::iter::once(job.clone())
+        .flatten()
+        .map(|job_pair| job_pair.0)
+        .collect::<Vec<_>>();
+    let groups_cache = app.db
+        .get_groups_cache()
+        .await;
+    let mut all_errors: Option<String> = None;
+    let tables = vec!(
+            ("Metadata", vec!(
+                TableStat::JobID,
+                TableStat::JobOwner,
+                TableStat::JobName(20),
+                TableStat::JobProject,
+                TableStat::Queue,
+                TableStat::Status,
+                TableStat::ExitStatus,
+            )),
+            ("Walltime", vec!(
+                TableStat::StartTime,
+                TableStat::EndTime,
+                TableStat::RsvdTime,
+                TableStat::ElapsedWalltime,
+            )),
+            ("CPU", vec!(
+                TableStat::CpuTime,
+                TableStat::RsvdCpus,
+                TableStat::UsedMemPerCore,
+                TableStat::CpuEfficiency,
+            )),
+            ("Memory", vec!(
+                TableStat::UsedMem,
+                TableStat::UsedOverRsvdMem,
+                TableStat::RsvdMem,
+                TableStat::MemEfficiency,
+            )),
+            ("Other Hardware", vec!(
+                TableStat::RsvdGpus,
+                TableStat::NodesChunks,
+            ))
+        )
+        .into_iter()
+        .map(|(title, stats)| {
+            let (table_entries, errors) = sort_build_parse(
+                groups_cache.clone(),
+                stats,
+                &mut jobs,
+                &params,
+                username.clone()
+            );
+
+            if let Some(errors) = errors {
+                if let Some(all_errors) = all_errors.as_mut() {
+                    *all_errors += " ";
+                    all_errors.push_str(&errors);
+                } else {
+                    all_errors = Some(errors);
+                }
+            }
+
+            (title.to_string(), table_entries)
+        })
+        .collect::<Vec<_>>();
     if let Some(ref mut job) = job {
+        if let Some(modified_job) = jobs.get(0) {
+            job.0 = modified_job.clone();
+        }
+
         let owner = job.0.get("owner")
             .ok_or_else(||
                 (
@@ -111,10 +182,6 @@ pub async fn stats(
                     "No owner found for job!".to_string()
                 )
             )?;
-
-        let groups_cache = app.db
-            .get_groups_cache()
-            .await;
     
         job.0.insert(
             String::from("project"),
@@ -126,14 +193,14 @@ pub async fn stats(
                 .unwrap_or(String::from("None"))
         );
     }
-
+    
     // Build template
     let template = StatsPageTemplate {
         alert: if let Some(_) = username {
             if let None = id_query {
                 Some("No job ID provided!".to_string())
             } else {
-                None
+                all_errors
             }
         } else {
             Some("You are not logged in!".to_string())
@@ -148,6 +215,7 @@ pub async fn stats(
 
         job,
         jobs: vec!(),
+        tables,
         url_prefix: &app.url_prefix,
 
         toolkit:Toolkit
