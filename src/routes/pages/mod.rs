@@ -338,7 +338,7 @@ impl Into<TableEntry> for TableStat {
             },
             TableStat::NodesChunks => TableEntry {
                 name: String::from("Nodes/Chunks"),
-                tooltip: String::from("<b>Number of Nodes/Chunks</b><br><br>The number of nodes and chunks used by the job"),
+                tooltip: String::from("<b>Number of Nodes/Chunks</b>"),
                 sort_by: None,
                 value: String::from("nodes/chunks"),
                 value_unit: None,
