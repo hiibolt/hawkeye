@@ -1,5 +1,5 @@
 use super::super::AppState;
-use super::{timestamp_field_to_date, try_render_template, TableEntry, TableStat, TableStatType, Toolkit, sort_build_parse};
+use super::{timestamp_field_to_date, try_render_template, TableEntry, TableStat, TableStatType, Toolkit, PageType, sort_build_parse};
 
 use std::collections::{HashMap, HashSet};
 use std::{collections::BTreeMap, sync::Arc};
@@ -31,7 +31,8 @@ struct StatsPageTemplate<'a> {
     tables: Vec<(String, Vec<TableEntry>)>,
     url_prefix: &'a str,
     
-    toolkit: Toolkit
+    toolkit: Toolkit,
+    page_type: PageType
 }
 #[tracing::instrument]
 pub async fn stats(
@@ -218,7 +219,8 @@ pub async fn stats(
         tables,
         url_prefix: &app.url_prefix,
 
-        toolkit:Toolkit
+        toolkit:Toolkit,
+        page_type: PageType::Stats
     };
 
     try_render_template(&template)

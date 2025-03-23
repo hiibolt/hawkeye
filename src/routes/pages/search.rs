@@ -1,5 +1,5 @@
 use super::super::AppState;
-use super::{try_render_template, TableEntry, TableStat, TableStatType, Toolkit, sort_build_parse};
+use super::{try_render_template, TableEntry, TableStat, TableStatType, Toolkit, PageType, sort_build_parse};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -32,7 +32,8 @@ struct SearchPageTemplate<'a> {
     date_query: Option<String>,
     url_prefix: &'a str,
 
-    toolkit: Toolkit
+    toolkit: Toolkit,
+    page_type: PageType
 }
 #[tracing::instrument]
 pub async fn search(
@@ -164,7 +165,8 @@ pub async fn search(
         date_query,
         url_prefix,
 
-        toolkit:Toolkit
+        toolkit:Toolkit,
+        page_type: PageType::Search
     };
 
     try_render_template(&template)

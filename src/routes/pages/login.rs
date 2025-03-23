@@ -40,7 +40,7 @@ pub async fn login(
                     .unwrap_or(false))
             })
             .unwrap_or(false),
-        url_prefix,
+        url_prefix
     };
 
     try_render_template(&template)

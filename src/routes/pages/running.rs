@@ -1,7 +1,7 @@
 use crate::routes::ClusterStatus;
 
 use super::super::AppState;
-use super::{try_render_template, TableEntry, TableStat, TableStatType, Toolkit, sort_build_parse};
+use super::{try_render_template, TableEntry, TableStat, TableStatType, Toolkit, PageType, sort_build_parse};
 
 use std::collections::HashMap;
 use std::{collections::BTreeMap, sync::Arc};
@@ -31,7 +31,8 @@ struct RunningPageTemplate<'a> {
     cluster_status: Option<ClusterStatus>,
     url_prefix: &'a str,
 
-    toolkit: Toolkit
+    toolkit: Toolkit,
+    page_type: PageType
 }
 #[tracing::instrument]
 pub async fn running(
@@ -111,7 +112,8 @@ pub async fn running(
         cluster_status: app.status.read().await.clone(),
         url_prefix,
 
-        toolkit: Toolkit
+        toolkit: Toolkit,
+        page_type: PageType::Running
     };
 
     try_render_template(&template)

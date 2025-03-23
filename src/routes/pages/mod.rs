@@ -10,6 +10,13 @@ pub mod search;
 pub mod stats;
 
 #[derive(Clone, Debug)]
+enum PageType {
+    Running,
+    Completed,
+    Search,
+    Stats
+}
+#[derive(Clone, Debug)]
 enum TableStatType {
     Default,
 

@@ -252,10 +252,14 @@
                         {{ alert|as_ref|escape("none") }}
                     </p>
                 {% when None %}
-                    {% if jobs.len() == 0 %}
-                        <p id="alert-footer" style="text-align:center">
-                            No jobs found!
-                        </p>
+                    {% if let PageType::Stats = page_type %}
+                        <!-- :3 -->
+                    {% else %}
+                        {% if jobs.len() == 0 %}
+                            <p id="alert-footer" style="text-align:center">
+                                No jobs found!
+                            </p>
+                        {% endif %}
                     {% endif %}
             {% endmatch %}
         </main>

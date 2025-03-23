@@ -1,5 +1,5 @@
 use super::super::AppState;
-use super::{sort_build_parse, try_render_template, Toolkit, TableEntry, TableStat, TableStatType};
+use super::{sort_build_parse, try_render_template, Toolkit, TableEntry, TableStat, TableStatType, PageType};
 
 use std::{collections::{BTreeMap, HashMap}, sync::Arc};
 
@@ -29,6 +29,7 @@ struct CompletedPageTemplate<'a> {
     date_query: Option<String>,
     url_prefix: &'a str,
 
+    page_type: PageType,
     toolkit: Toolkit
 }
 #[tracing::instrument]
@@ -146,7 +147,8 @@ pub async fn completed(
         date_query,
         url_prefix,
 
-        toolkit:Toolkit
+        toolkit:Toolkit,
+        page_type: PageType::Completed
     };
 
     try_render_template(&template)
