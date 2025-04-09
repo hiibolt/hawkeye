@@ -206,9 +206,11 @@ async fn grab_jobs_helper (
         .replace("CPU cores: ", "")
         .replace("GPU cores: ", "")
         .replace("used + ", "")
-        .replace("unused = ", "")
+        .replace("unused + ", "")
+        .replace("unavailable = ", "")
         .replace(" total", "")
-        .replace("status: [R]unning", "");
+        .replace("status: [R]unning", "")
+        .replace("[Q]ueued", "");
     let node_stats = cluster_status_data_raw.split("\n")
         .next()
         .context("Invalid cluster status (nodes) input! Input:\n{cluster_status_data_raw:?}")?
@@ -225,16 +227,16 @@ async fn grab_jobs_helper (
         .split(" ")
         .collect::<Vec<&str>>();
 
-    if node_stats.len() != 3 || cpu_stats.len() != 3 || gpu_stats.len() != 3 {
+    if node_stats.len() != 4 || cpu_stats.len() != 4 || gpu_stats.len() != 4 {
         bail!("Invalid cluster status data!")
     }
     
     *app.status.write().await = Some(crate::routes::ClusterStatus {
-        total_nodes: node_stats.get(2).context("Missing node field 2")?.parse::<u32>()?,
+        total_nodes: node_stats.get(3).context("Missing node field 3")?.parse::<u32>()?,
         used_nodes: node_stats.get(0).context("Missing node field 0")?.parse::<u32>()?,
-        total_cpus: cpu_stats.get(2).context("Missing cpu field 2")?.parse::<u32>()?,
+        total_cpus: cpu_stats.get(3).context("Missing cpu field 3")?.parse::<u32>()?,
         used_cpus: cpu_stats.get(0).context("Missing cpu field 0")?.parse::<u32>()?,
-        total_gpus: gpu_stats.get(2).context("Missing gpu field 2")?.parse::<u32>()?,
+        total_gpus: gpu_stats.get(3).context("Missing gpu field 3")?.parse::<u32>()?,
         used_gpus: gpu_stats.get(0).context("Missing gpu field 0")?.parse::<u32>()?,
     });
 
