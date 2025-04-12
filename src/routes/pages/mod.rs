@@ -573,11 +573,11 @@ fn add_efficiency_tooltips ( job: &mut BTreeMap<String, String> ) {
 
     job.insert(
         String::from("cpu_efficiency_tooltip"),
-        format!("<b>CPU Efficiency: {cpu_efficiency:.2}%</b>") + &if cpu_efficiency >= 50f32 {
+        format!("<b>CPU Efficiency: {cpu_efficiency:.2}%</b>") + &if cpu_efficiency < 75f32 {
             String::from("<br><br>")
             + match cpu_efficiency {
+                x if x < 50f32 => "The job had a low CPU load, consider reserving fewer CPUs.",
                 x if x < 75f32 => "The job is using the CPU somewhat efficiently.",
-                x if x >= 75f32 => "The job is using the CPU very efficiently!",
                 _ => "Abnormal CPU usage!"
             }
             + "<br><br>"
@@ -588,11 +588,11 @@ fn add_efficiency_tooltips ( job: &mut BTreeMap<String, String> ) {
     );
     job.insert(
         String::from("mem_efficiency_tooltip"),
-        format!("<b>Memory Efficiency: {mem_efficiency:.2}%</b>") + &if mem_efficiency >= 50f32 {
+        format!("<b>Memory Efficiency: {mem_efficiency:.2}%</b>") + &if mem_efficiency < 75f32 {
             String::from("<br><br>")
             + match mem_efficiency {
+                x if x < 50f32 => "The job had low memory utilization; consider reserving less memory.",
                 x if x < 75f32 => "The job is using the memory somewhat efficiently. If you are using a GPU, this is okay.",
-                x if x >= 75f32 => "The job is using the memory very efficiently!",
                 _ => "Abnormal memory usage!"
             }
             + "<br><br>"

@@ -207,7 +207,7 @@ pub fn jmanl_job_str_to_btree<'a>(
 
     info!("Calculating CPU Efficiency...");
     let cpu_efficiency = 
-    ( entry.get("resources_used.cpupercent")
+    ( ( entry.get("resources_used.cpupercent")
         .context("Missing field 'resources_used.cpupercent'")?
         .parse::<f64>()
         .context("Couldn't parse CPU time!")? )
@@ -216,7 +216,7 @@ pub fn jmanl_job_str_to_btree<'a>(
             .context("Missing field 'Resource_List.ncpus'")?
             .parse::<f64>()
             .context("Couldn't parse CPU time!")? * 100f64 )
-        * 100f64;
+        * 100f64 ).min(100f64);
     entry.insert("cpu_efficiency".to_string(), cpu_efficiency.to_string());
 
     info!("\t\t[ Done! ]");
@@ -227,7 +227,6 @@ pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, 
     let mut entry = BTreeMap::new();
 
     info!("\n[ Looking at the following job ]\n{job}");
-
     for (ind, field) in job.lines().enumerate() {
         if ind == 0 {
             entry.insert("job_id", field.to_string());
@@ -322,7 +321,7 @@ pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, 
 
     info!("\t[ Calculating CPU Efficiency... ]");
     let cpu_efficiency = 
-    ( entry.get("resources_used.cpupercent")
+    ( ( entry.get("resources_used.cpupercent")
         .context("Missing field 'resources_used.cpupercent'")?
         .parse::<f64>()
         .context("Couldn't parse CPU time!")? )
@@ -331,7 +330,7 @@ pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, 
             .context("Missing field 'Resource_List.ncpus'")?
             .parse::<f64>()
             .context("Couldn't parse CPU time!")? * 100f64 )
-        * 100f64;
+        * 100f64 ).min(100f64);
     entry.insert("cpu_efficiency", cpu_efficiency.to_string());
 
     Ok(entry)

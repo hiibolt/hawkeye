@@ -149,7 +149,7 @@ impl DB {
             "INSERT INTO PastStats (pbs_id, cpu_percent, mem, datetime) VALUES (?1, ?2, ?3, ?4)",
             params![
                 job.get("job_id").context("Missing job ID")?,
-                job.get("resources_used.cpupercent").context("Missing job CPU percent")?,
+                job.get("cpu_efficiency").context("Missing job CPU efficiency")?,
                 job.get("resources_used.mem").context("Missing job used memory")?,
                 formatted_datetime
             ],
