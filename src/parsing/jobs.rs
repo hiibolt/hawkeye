@@ -23,10 +23,28 @@ pub fn convert_mem_to_f64 ( st: &str ) -> Result<f64> {
             .context("Invalid memory string!")?
             .parse::<f64>()
             .context("Couldn't convert memory string to f64!")?);
-    } else {
-        error!("Recieved unusual memory input!");
-        bail!("Recieved unusual memory input!");
+    } 
+
+    // Check if the last character is 'b', but the second
+    //  to last character is not a letter
+    //
+    // We return 0.0 in this case, as it indicates that the
+    //  requested memory is in bits, which does not easily
+    //  convert to gigabytes
+    if st.chars().last() == Some('b') && !st.chars().nth_back(1).unwrap().is_alphabetic() {
+        return Ok(0.0);
     }
+
+    // Check if the last character is 'b', but the second
+    //  to last character is a letter, and error out
+    //  stating that the type is not supported
+    if st.chars().last() == Some('b') && st.chars().nth_back(1).unwrap().is_alphabetic() {
+        error!("Recieved unusual memory size - {st}");
+        bail!("Recieved unusual memory size - {st}");
+    }
+    
+    error!("Recieved unusual memory input - {st}");
+    bail!("Recieved unusual memory input - {st}");
 }
 #[tracing::instrument]
 pub fn date_to_unix_timestamp(date_str: &str) -> Result<u32, String> {

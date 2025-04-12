@@ -573,42 +573,48 @@ fn add_efficiency_tooltips ( job: &mut BTreeMap<String, String> ) {
 
     job.insert(
         String::from("cpu_efficiency_tooltip"),
-        format!("<b>CPU Efficiency: {cpu_efficiency:.2}%</b>")
-        + "<br><br>"
-        + match cpu_efficiency {
-            x if x < 50f32 => "The job had a low CPU load, consider reserving fewer CPUs.",
-            x if x < 75f32 => "The job is using the CPU somewhat efficiently.",
-            x if x >= 75f32 => "The job is using the CPU very efficiently!",
-            _ => "Abnormal CPU usage!"
-        } 
-        + "<br><br>"
-        + "See the <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#jobcontrol\">CRCD docs</a> for more information."
+        format!("<b>CPU Efficiency: {cpu_efficiency:.2}%</b>") + &if cpu_efficiency >= 50f32 {
+            String::from("<br><br>")
+            + match cpu_efficiency {
+                x if x < 75f32 => "The job is using the CPU somewhat efficiently.",
+                x if x >= 75f32 => "The job is using the CPU very efficiently!",
+                _ => "Abnormal CPU usage!"
+            }
+            + "<br><br>"
+            + "See the <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#jobcontrol\">CRCD docs</a> for more information."
+        } else {
+            String::from("")
+        }
     );
     job.insert(
         String::from("mem_efficiency_tooltip"),
-        format!("<b>Memory Efficiency: {mem_efficiency:.2}%</b>")
-        + "<br><br>"
-        + match mem_efficiency {
-            x if x < 50f32 => "The job had low memory utilization; consider reserving less memory.",
-            x if x < 75f32 => "The job is using the memory somewhat efficiently. If you are using a GPU, this is okay.",
-            x if x >= 75f32 => "The job is using the memory very efficiently!",
-            _ => "Abnormal memory usage!"
+        format!("<b>Memory Efficiency: {mem_efficiency:.2}%</b>") + &if mem_efficiency >= 50f32 {
+            String::from("<br><br>")
+            + match mem_efficiency {
+                x if x < 75f32 => "The job is using the memory somewhat efficiently. If you are using a GPU, this is okay.",
+                x if x >= 75f32 => "The job is using the memory very efficiently!",
+                _ => "Abnormal memory usage!"
+            }
+            + "<br><br>"
+            + "See the <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#jobcontrol\">CRCD docs</a> for more information."
+        } else {
+            String::from("")
         }
-        + "<br><br>"
-        + "See the <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#jobcontrol\">CRCD docs</a> for more information."
     );
     job.insert(
         String::from("walltime_efficiency_tooltip"),
-        format!("<b>Walltime Efficiency: {walltime_efficiency:.2}%</b>") 
-        + "<br><br>"
-        + match walltime_efficiency {
-            x if x < 50f32 => "The job took significantly less time than requested; please consider decreasing the requirement. The accurate estimation of the walltime needed is essential for the job starting time and will allow a better schedule of maintenance tasks.",
-            x if x < 80f32 => "The job is using the walltime efficiently.",
-            x if x >= 80f32 => "The job is potentially using too much walltime, consider allocating more for breathing room to avoid having the job killed.",
-            _ => "Abnormal walltime usage!"
+        format!("<b>Walltime Efficiency: {walltime_efficiency:.2}%</b>") + &if walltime_efficiency < 50f32 || walltime_efficiency >= 80f32 {
+            String::from("<br><br>")
+            + match walltime_efficiency {
+                x if x < 50f32 => "The job took significantly less time than requested; please consider decreasing the requirement. The accurate estimation of the walltime needed is essential for the job starting time and will allow a better schedule of maintenance tasks.",
+                x if x >= 80f32 => "The job is potentially using too much walltime, consider allocating more for breathing room to avoid having the job killed.",
+                _ => "Abnormal walltime usage!"
+            }
+            + "<br><br>"
+            + "See the <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#jobcontrol\">CRCD docs</a> for more information."
+        } else {
+            String::from("")
         }
-        + "<br><br>"
-        + "See the <a href=\"https://www.niu.edu/crcd/current-users/getting-started/queue-commands-job-management.shtml#jobcontrol\">CRCD docs</a> for more."
     );
 }
 fn signal_to_str_suffix ( 

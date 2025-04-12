@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, sync::Arc};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use regex::Regex;
 use tracing::{error, info};
 use tokio::task::JoinSet;
@@ -226,17 +226,13 @@ async fn grab_jobs_helper (
         .context("Invalid cluster status (GPUs) input! Input:\n{cluster_status_data_raw:?}")?
         .split(" ")
         .collect::<Vec<&str>>();
-
-    if node_stats.len() != 4 || cpu_stats.len() != 4 || gpu_stats.len() != 4 {
-        bail!("Invalid cluster status data!")
-    }
     
     *app.status.write().await = Some(crate::routes::ClusterStatus {
-        total_nodes: node_stats.get(3).context("Missing node field 3")?.parse::<u32>()?,
+        total_nodes: node_stats.get(node_stats.len() - 1).context("Missing node field 3")?.parse::<u32>()?,
         used_nodes: node_stats.get(0).context("Missing node field 0")?.parse::<u32>()?,
-        total_cpus: cpu_stats.get(3).context("Missing cpu field 3")?.parse::<u32>()?,
+        total_cpus: cpu_stats.get(cpu_stats.len() - 1).context("Missing cpu field 3")?.parse::<u32>()?,
         used_cpus: cpu_stats.get(0).context("Missing cpu field 0")?.parse::<u32>()?,
-        total_gpus: gpu_stats.get(3).context("Missing gpu field 3")?.parse::<u32>()?,
+        total_gpus: gpu_stats.get(gpu_stats.len() - 1).context("Missing gpu field 3")?.parse::<u32>()?,
         used_gpus: gpu_stats.get(0).context("Missing gpu field 0")?.parse::<u32>()?,
     });
 
