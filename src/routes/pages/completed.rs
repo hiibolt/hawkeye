@@ -55,21 +55,30 @@ pub async fn completed(
 
     // Convert our date query to a timestamp, using `month`
     //  by default. Options are `day`, `month`, `year`, `all` (10 years)
-    let timestamp_filter = if let Some(ref date_query) = date_query {
-        let date_query = date_query.to_lowercase();
-        let now = chrono::Local::now();
-        let timestamp = match date_query.as_str() {
-            "day" => now.timestamp() - 86400,
-            "month" => now.timestamp() - 2592000,
-            "year" => now.timestamp() - 31536000,
-            "all" => now.timestamp() - 315360000,
-            _ => now.timestamp() - 2592000
-        };
+    let adjusted_timestamp = match date_query {
+        Some(ref date_query) => {
+            let date_query = date_query.to_lowercase();
+            let now = chrono::Local::now();
 
-        timestamp.to_string()
-    } else { // Default to a month
-        (chrono::Local::now().timestamp() - 2592000).to_string()
+            match date_query.as_str() {
+                "day" => now.timestamp() - 86400,
+                "month" => now.timestamp() - 2592000,
+                "year" => now.timestamp() - 31536000,
+                "all" => now.timestamp() - 315360000,
+                _ => now.timestamp() - 2592000
+            }
+        },
+        None => chrono::Local::now().timestamp() - 2592000
     };
+
+    // Make it a human readable date
+    let adjusted_date = chrono::DateTime::from_timestamp(adjusted_timestamp, 0)
+        .ok_or_else(|| {
+            error!("Couldn't convert timestamp to date!");
+
+            (StatusCode::INTERNAL_SERVER_ERROR, "Couldn't convert timestamp to date!".to_string())
+        })?;
+    let adjusted_date = adjusted_date.format("%b %e, %Y at %l:%M%p").to_string();
 
     // Get the jobs
     let mut jobs = if let Some(_) = username {    
@@ -80,7 +89,7 @@ pub async fn completed(
                 None,
                 None,
                 None, 
-                Some(&timestamp_filter)
+                Some(&adjusted_timestamp.to_string())
             )
             .await
             .map_err(|e| {
@@ -130,12 +139,12 @@ pub async fn completed(
             },
         username,
         needs_login: true,
-        title: String::from("Completed Jobs - CRCD Batchmon"),
+        title: format!("Completed Jobs - CRCD Batchmon"),
         header: if let Some(ref user_query) = user_query {
             format!(
-                "Completed Jobs for '{}' on Metis ({})",
+                "Completed Jobs for '{}' on Metis - Since {}",
                 user_query,
-                date_query.clone().unwrap_or("month".to_string())
+                adjusted_date
             )
         } else {
             String::from("Completed Jobs on Metis")

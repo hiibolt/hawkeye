@@ -107,6 +107,28 @@ impl DB {
             "INSERT OR IGNORE INTO Users (name) VALUES (?1)",
             [&job.get("Job_Owner").context("Missing job owner")?],
         )?;
+
+        // Fix the `Resource_List.select` field (add `nchunks=` to the beginning)
+        //  so that `1:ncpus=32:mpiprocs=32:ngpus=1:mem=50gb` becomes 
+        //  `nchunks=1:ncpus=32:mpiprocs=32:ngpus=1:mem=50gb`
+        let select = job.get("Resource_List.select").context("Missing job select")?;
+        let select = if select.starts_with("nchunks=") {
+            select.to_string()
+        } else {
+            format!("nchunks={select}")
+        };
+
+        // If there are no chunks, get it from the `Resource_List.select` field
+        let chunks = match job.get("chunks") {
+            Some(chunks) => chunks.to_string(),
+            None => {
+                select.split('=')
+                    .nth(1).context("Missing chunks value in select statement (1)")?
+                    .split(':')
+                    .next().context("Missing chunks value in select statement (2)")?
+                    .to_string()
+            }
+        };
         
         // Add the job
         conn.execute(
@@ -123,7 +145,7 @@ impl DB {
                 job.get("Resource_List.ncpus").unwrap_or(&String::from("0")),
                 job.get("Resource_List.ngpus").unwrap_or(&String::from("0")),
                 job.get("Resource_List.walltime").context("Missing job walltime")?,
-                job.get("Resource_List.select").context("Missing job select")?,
+                select,
                 job.get("mem_efficiency").context("Missing job memory efficiency")?,
                 job.get("walltime_efficiency").context("Missing job walltime efficiency")?,
                 job.get("cpu_efficiency").context("Missing job CPU efficiency")?,
@@ -131,7 +153,7 @@ impl DB {
                 job.get("resources_used.mem").context("Missing job used memory")?,
                 job.get("resources_used.walltime").context("Missing job used walltime")?,
                 job.get("end_time").unwrap_or(&i32::MAX.to_string()),
-                job.get("chunks").unwrap_or(&String::from("Not Yet Completed")),
+                chunks,
                 job.get("Exit_status").unwrap_or(&String::from("Not Yet Completed")),
                 job.get("estimated.start_time").unwrap_or(&String::from("Already Started/Unknown")),
                 job.get("resources_used.cput").unwrap_or(&String::from("00:00:00")),

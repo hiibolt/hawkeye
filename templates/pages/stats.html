@@ -40,7 +40,7 @@
       
             <div class="job-header">
                 <p>
-                    <b>Job ID</b>: {{ job["pbs_id"] }}, <b>Job Name</b>: {{ job["name"] }} ({{ job["state"] }}), <b>PBS Requirements</b>: nchunks{{ job["req_select"] }}
+                    <b>Job ID</b>: {{ job["pbs_id"] }}, <b>Job Name</b>: {{ job["name"] }} ({{ job["state"] }}), <b>PBS Requirements</b>: {{ job["req_select"] }}
                     <br>
                     <b>Submitted by</b> <a href="{{ url_prefix }}/completed?user={{ job["owner"] }}">{{ job["owner"] }}</a> ({{ job["project"] }}) {% if job["start_time"] != "2147483647" %} <b>on</b> {{ job["start_time"] }}{% endif %}
                 </p>
