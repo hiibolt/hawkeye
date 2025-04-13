@@ -287,10 +287,10 @@
                     data: {
                         labels: stats_json.map((_, index) => `${stats_json[index].datetime}`),
                         datasets: [{
-                            label: 'CPU Usage (%)',
+                            label: 'CPU Usage vs. Date and Time',
                             data: cpuData,
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            borderColor: 'rgba(0, 0, 0, 1)',
+                            backgroundColor: 'rgba(0, 0, 0, 0.2)',
                             fill: true,
                         }]
                     },
@@ -300,19 +300,33 @@
                             y: {
                                 beginAtZero: true,
                                 max: 100,
+                                title: {
+                                    display: true,
+                                    text: 'CPU Efficiency (%)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Date and Time'
+                                },
+                                ticks: {
+                                    autoSkip: true,
+                                    maxTicksLimit: 10,
+                                }
                             }
                         }
-                    }
+                    },
                 });
                 const memChart = new Chart(ctxMem, {
                     type: 'line',
                     data: {
                         labels: stats_json.map((_, index) => `${stats_json[index].datetime}`),
                         datasets: [{
-                            label: 'Memory Usage (GB)',
+                            label: 'Memory Usage vs. Date and Time',
                             data: memData,
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderColor: 'rgba(0, 0, 0, 1)',
+                            backgroundColor: 'rgba(0, 0, 0, 0.2)',
                             fill: true,
                         }]
                     },
@@ -321,6 +335,20 @@
                         scales: {
                             y: {
                                 beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Memory Usage (GB)'
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Date and Time'
+                                },
+                                ticks: {
+                                    autoSkip: true,
+                                    maxTicksLimit: 10,
+                                }
                             }
                         }
                     }
