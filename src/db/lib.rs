@@ -240,7 +240,7 @@ impl DB {
             .collect();
         
         // Find all jobs that are in state 'R' in our local DB
-        let mut stmt = conn.prepare("SELECT pbs_id FROM Jobs WHERE state = 'R'")?;
+        let mut stmt = conn.prepare("SELECT pbs_id FROM Jobs WHERE state = 'R' OR state = 'Q")?;
         let rows = stmt.query_map([], |row| row.get::<_, i32>(0))?;
     
         // For each job in state 'R', check if it's still active
