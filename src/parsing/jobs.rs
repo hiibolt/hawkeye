@@ -208,7 +208,7 @@ pub fn jmanl_job_str_to_btree<'a>(
     info!("Calculating CPU Efficiency...");
     let cpu_efficiency = 
     ( ( entry.get("resources_used.cpupercent")
-        .context("Missing field 'resources_used.cpupercent'")?
+        .unwrap_or(&String::from("0"))
         .parse::<f64>()
         .context("Couldn't parse CPU time!")? )
         /
@@ -322,7 +322,7 @@ pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, 
     info!("\t[ Calculating CPU Efficiency... ]");
     let cpu_efficiency = 
     ( ( entry.get("resources_used.cpupercent")
-        .context("Missing field 'resources_used.cpupercent'")?
+        .unwrap_or(&String::from("0"))
         .parse::<f64>()
         .context("Couldn't parse CPU time!")? )
         /
