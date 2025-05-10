@@ -64,47 +64,39 @@
         text-decoration: none;
     }
 
-    /* Graciously taken from https://codepen.io/chocochip/pen/zYxMgRG */
-    .popover__wrapper {
-        position: relative; /* This makes the popover content position relative to the wrapper */
-        z-index: -1;
-    }
-
     .popover__content {
         opacity: 0;
         visibility: hidden;
         position: absolute;
-        left: 50%;
-        top: 100%; /* Moves the box below the wrapper */
-        transform: translateX(-50%); /* Centers the popover horizontally relative to the wrapper */
         background-color: #bfbfbf;
         padding: 1.5rem;
         box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.26);
         width: 200px;
-        margin-top: 10px; /* Add space between the box and the element */
-    }
-
-    .popover__content:before {
-        z-index: 0;
-        position: absolute;
-        content: "";
-        left: 50%;
-        bottom: 100%; /* Moves the arrow above the popover */
-        transform: translateX(-50%);
-        border-style: solid;
-        border-width: 0 10px 10px 10px;
-        border-color: transparent transparent #bfbfbf transparent;
-        transition-duration: 0.3s;
-        transition-property: transform;
+        margin-top: 10px;
+        pointer-events: none; /* Optional: prevents interfering with mouse */
     }
 
     .popover__wrapper:hover .popover__content {
         z-index: 999;
         opacity: 1;
         visibility: visible;
-        transform: translateX(-50%); /* Ensure popover stays centered */
-        transition: all 0.5s cubic-bezier(0.75, -0.02, 0.2, 0.97);
+        transition: opacity 0.2s;
     }
+
+    /*
+    .popover__content:before {
+        z-index: 1;
+        position: absolute;
+        content: "";
+        left: 50%;
+        bottom: 100%;
+        transform: translateX(-50%);
+        border-style: solid;
+        border-width: 0 10px 10px 10px;
+        border-color: transparent transparent #bfbfbf transparent;
+        transition-duration: 0.3s;
+        transition-property: transform;
+    }*/
 
     .popover__message {
         text-align: center;
@@ -125,6 +117,7 @@
     <!-- Above Favicon Created and Licensed by https://thenounproject.com/creator/heztasia/ -->
 </head>
 <body>
+             
     <!-- Header Bar -->
     <header>
         <div class="branding">

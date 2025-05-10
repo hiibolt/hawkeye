@@ -55,11 +55,14 @@
             <h2>CRCD Batchmon Login</h2>
         </div>
         <form action="api/v1/auth/login" method="POST" class="login-form" autocomplete="off">
-            <label for="one">UNIX Account:</label>
-            <input type="text" id="one" name="one" required>
-            
-            <label for="two">UNIX Password:</label>
-            <input type="password" id="two" name="two" required>
+            <input type="text" name="fakeuser" autocomplete="username" style="display:none;">
+            <input type="password" name="fakepass" autocomplete="current-password" style="display:none;">
+        
+            <label for="one">Metis Account:</label>
+            <input type="text" id="one" name="one" autocomplete="off" required>
+
+            <label for="two">Metis Password:</label>
+            <input type="password" id="two" name="two" autocomplete="new-password" required>
             
             <button id="login-button" type="submit"><b>Login</b></button>
         </form>

@@ -183,7 +183,7 @@ impl DB {
     pub async fn get_groups_cache (
         &self
     ) -> HashMap<String, HashSet<String>> {
-        return self.groups_cache.lock().await.clone();
+        self.groups_cache.lock().await.clone()
     }
     pub async fn insert_user_groups (
         &self,
