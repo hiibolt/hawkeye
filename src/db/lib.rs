@@ -239,7 +239,7 @@ impl DB {
             .flat_map(|job| Some(job.get("job_id")?.parse::<i32>().ok()?))
             .collect();
         
-        // Find all jobs that are in state 'R' in our local DB
+        // Find all jobs that are in state 'R' or 'Q' in our local DB
         let mut stmt = conn.prepare("SELECT pbs_id FROM Jobs WHERE state = 'R' OR state = 'Q")?;
         let rows = stmt.query_map([], |row| row.get::<_, i32>(0))?;
     
@@ -344,10 +344,11 @@ impl DB {
     pub async fn get_all_jobs (
         &self,
         filter_states: Option<Vec<&str>>,
-        filter_queue: Option<&String>,
-        filter_owner: Option<&String>,
-        filter_name: Option<&String>,
-        filter_date: Option<&String>
+        filter_queue:  Option<&String>,
+        filter_owner:  Option<&String>,
+        filter_name:   Option<&String>,
+        filter_group:  Option<&String>,
+        filter_date:   Option<&String>
     ) -> Result<Vec<BTreeMap<String, String>>> {
         let conn = self.conn.lock().await;
 
@@ -388,6 +389,15 @@ impl DB {
             additional_filters.push_str(&format!("name = ?{}", params.len() + 1));
             params.push(filter_name);
         }
+        if let Some(filter_group) = filter_group {
+            if !additional_filters.is_empty() {
+                additional_filters.push_str(" AND ");
+            }
+            info!("Filtering by group: {filter_group}");
+            additional_filters.push_str(&format!("owner IN (SELECT user_name FROM UserGroups WHERE group_name = ?{})", params.len() + 1));
+            params.push(filter_group);
+        }
+
         // Make sure that the job is before or on the specified date,
         //  OR has not completed (state = R).
         if let Some(filter_date) = filter_date {

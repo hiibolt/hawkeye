@@ -36,6 +36,12 @@
                     {% when None %}
                         <input type="text" id="user" placeholder="Username"/>
                 {% endmatch %}
+                {% match group_query %}
+                    {% when Some with (group_query) %}
+                        <input type="text" id="group" placeholder="Group" value="{{ group_query }}"/>
+                    {% when None %}
+                        <input type="text" id="group" placeholder="Group"/>
+                {% endmatch %}
                 <div>
                     <label for="date-dropdown"><b>Date:</b></label>
                     {% match date_query %}
@@ -83,6 +89,7 @@
                 const queue_input = document.getElementById('queue');
                 const state_input = document.getElementById('state');
                 const name_input = document.getElementById('name');
+                const group_input = document.getElementById('group');
                 const date_dropdown = document.getElementById('date-dropdown');
             
                 search_button.addEventListener('click', () => {
@@ -90,6 +97,7 @@
                     const queue = queue_input.value;
                     const state = state_input.value;
                     const name = name_input.value;
+                    const group = group_input.value;
                     const date = date_dropdown.value;
                     let url = `{{ url_prefix }}/search?`;
 
@@ -104,6 +112,9 @@
                     }
                     if (name) {
                         url += `name=${name}&`;
+                    }
+                    if (group) {
+                        url += `group=${group}&`;
                     }
                     if (date) {
                         url += `date=${date}&`;

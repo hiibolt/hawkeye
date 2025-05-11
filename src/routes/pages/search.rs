@@ -29,6 +29,7 @@ struct SearchPageTemplate<'a> {
     queue_query: Option<String>,
     user_query: Option<String>,
     name_query: Option<String>,
+    group_query: Option<String>,
     date_query: Option<String>,
     url_prefix: &'a str,
 
@@ -56,7 +57,8 @@ pub async fn search(
         params.get("queue").is_some() || 
         params.get("user").is_some() || 
         params.get("name").is_some() || 
-        params.get("date").is_some();
+        params.get("date").is_some() ||
+        params.get("group").is_some();
 
     // Convert our date query to a timestamp, using `month`
     //  by default. Options are `day`, `month`, `year`, `all` (10 years)
@@ -86,6 +88,7 @@ pub async fn search(
                     params.get("queue"),
                     params.get("user"),
                     params.get("name"),
+                    params.get("group"),
                     Some(&timestamp_filter)
                 )
                 .await
@@ -135,6 +138,11 @@ pub async fn search(
         username.clone()
     );
 
+    // Limit jobs to the first 200
+    if jobs.len() > 200 {
+        jobs = jobs.into_iter().take(200).collect();
+    }
+
     // Build jobs and template
     let url_prefix = &app.url_prefix;
     let template = SearchPageTemplate {
@@ -162,6 +170,7 @@ pub async fn search(
         queue_query: params.get("queue").and_then(|st| Some(st.to_owned())),
         user_query: params.get("user").and_then(|st| Some(st.to_owned())),
         name_query: params.get("name").and_then(|st| Some(st.to_owned())),
+        group_query: params.get("group").and_then(|st| Some(st.to_owned())),
         date_query,
         url_prefix,
 

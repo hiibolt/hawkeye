@@ -19,7 +19,7 @@
         top: 0;
         left: 0;
         width: calc(100% - 40px);
-        z-index: 1000; /* so it stays on top of the page content */
+        z-index: 800; /* so it stays on top of the page content */
     }
 
     .branding h1 {
@@ -73,7 +73,7 @@
         box-shadow: 0 2px 5px 0 rgba(0, 0, 0, 0.26);
         width: 200px;
         margin-top: 10px;
-        pointer-events: none; /* Optional: prevents interfering with mouse */
+        transform: translateX(-30%);
     }
 
     .popover__wrapper:hover .popover__content {
