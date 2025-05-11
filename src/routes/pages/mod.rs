@@ -635,9 +635,34 @@ fn signal_to_str_suffix (
     }
 }
 fn add_exit_status_tooltip ( job: &mut BTreeMap<String, String> ) {
-    let exit_status = job.get("exit_status")
-        .and_then(|st| Some(st.parse::<i32>().unwrap_or(0)) )
-        .unwrap_or(0);
+    let exit_status = if let Some(exit_status) = job.get("exit_status") {
+        exit_status
+    } else {
+        job.insert(
+            String::from("exit_status_tooltip"),
+            String::from("Unable to get exit status!")
+        );
+        return;
+    };
+
+    let exit_status = if let Ok(exit_status) = exit_status.parse::<i32>() {
+        exit_status
+    } else {
+        if exit_status == "Not Yet Completed" {
+            job.insert(
+                String::from("exit_status_tooltip"),
+                String::from("<b>Not Yet Completed</b><br><br>")
+                + "The job has not yet completed. Please check back later."
+            );
+            return;
+        }
+
+        job.insert(
+            String::from("exit_status_tooltip"),
+            String::from("Unable to convert exit status to `i32`!")
+        );
+        return;
+    };
 
     job.insert(
         String::from("exit_status_tooltip"),
