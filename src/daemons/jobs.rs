@@ -14,6 +14,19 @@ use super::super::{
 const DEFAULT_JOBSTAT_PERIOD: u64 = 60 * 5;
 const DEFAULT_OLD_JOB_PERIOD: u64 = 60 * 30;
 
+fn render_full_error (
+    e: &anyhow::Error
+) -> String {
+    let mut full_error = String::new();
+    full_error.push_str(&format!("Error: {}\n", e));
+    full_error.push_str("Full error chain:\n");
+    for (i, cause) in e.chain().enumerate() {
+        full_error.push_str(&format!("  {}: {}\n", i, cause));
+    }
+
+    full_error
+}
+
 #[tracing::instrument]
 pub async fn grab_old_jobs_thread (
     app: Arc<AppState>,
@@ -54,7 +67,7 @@ pub async fn grab_old_jobs_thread (
         use_clrf = true;
         old_jobs_raw.split("Raw records::\r\n")
             .nth(1)
-            .ok_or(anyhow!("Invalid input! INput: {old_jobs_raw:?}"))?
+            .ok_or(anyhow!("Invalid input! Input: {old_jobs_raw:?}"))?
     };
     
     let jobs = if use_clrf { 
@@ -113,7 +126,7 @@ pub async fn grab_old_jobs_thread (
         app.db
             .insert_job(job)
             .await
-            .with_context(|| format!("Couldn't insert job {job:?}!"))?;
+            .with_context(|| format!("Couldn't insert old job {job:?}!"))?;
     }
 
     Ok(())
@@ -145,7 +158,8 @@ async fn grab_old_jobs_helper (
                 remote_hostname,
                 user_cloned
             ).await {
-                error!(%e, "Couldn't grab old jobs for {user}!");
+                let full_error = render_full_error(&e);
+                error!("Couldn't grab old jobs for {user}! {full_error}");
             }
         });
     }
@@ -262,16 +276,21 @@ async fn grab_jobs_helper (
         app.db
             .insert_job(job)
             .await
-            .with_context(|| "Couldn't insert job {job:?}!")?;
+            .with_context(|| "Couldn't insert new job {job:?}!")?;
     }
 
     // Mark jobs that are no longer active as 'S' (stopped)
     info!("Marking completed jobs...");
-    app.db
+    if let Err(e) = app.db
         .mark_completed_jobs(&jobs)
         .await
-        .context("Couldn't mark complete jobs!")?;
-    info!("Completed jobs marked!");
+        .context("Couldn't mark complete jobs!")
+    {
+        let full_error = render_full_error(&e);
+        error!("Couldn't mark completed jobs! {full_error}");
+    } else {
+        info!("Completed jobs marked successfully!");
+    }
 
     Ok(())
 }

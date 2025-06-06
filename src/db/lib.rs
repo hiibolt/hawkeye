@@ -240,7 +240,7 @@ impl DB {
             .collect();
         
         // Find all jobs that are in state 'R' or 'Q' in our local DB
-        let mut stmt = conn.prepare("SELECT pbs_id FROM Jobs WHERE state = 'R' OR state = 'Q")?;
+        let mut stmt = conn.prepare("SELECT pbs_id FROM Jobs WHERE state = 'R' OR state = 'Q'")?;
         let rows = stmt.query_map([], |row| row.get::<_, i32>(0))?;
     
         // For each job in state 'R', check if it's still active
@@ -250,15 +250,15 @@ impl DB {
             if !active_ids.contains(&pbs_id) {
                 info!("[ Marking job {} as completed... ]", pbs_id);
 
-                let now = SystemTime::now();
-                let secs_since_epoch = now.duration_since(UNIX_EPOCH)
-                    .context("Time went backwards")?
-                    .as_secs();
-
                 conn.execute(
                     "UPDATE Jobs SET state = 'E' WHERE pbs_id = ?1",
                     [pbs_id],
                 )?;
+
+                let now = SystemTime::now();
+                let secs_since_epoch = now.duration_since(UNIX_EPOCH)
+                    .context("Time went backwards")?
+                    .as_secs();
 
                 conn.execute(
                     "UPDATE Jobs SET end_time = ?1 WHERE pbs_id = ?2",
