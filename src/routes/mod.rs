@@ -4,7 +4,7 @@ use axum::response::IntoResponse;
 use axum::http::StatusCode;
 use anyhow::{Result, Context, anyhow};
 use openssh::Session;
-use tokio::{io::AsyncReadExt, sync::Mutex};
+use tokio::io::AsyncReadExt;
 use axum::http::header;
 use tokio::sync::RwLock;
 use tracing::error;
@@ -31,12 +31,12 @@ pub struct AppState {
     pub db: super::DB,
     pub url_prefix: String,
 
-    pub ssh_session: Arc<Mutex<Session>>,
+    pub ssh_session: Arc<RwLock<Session>>,
     pub status:      RwLock<Option<ClusterStatus>>
 }
 impl AppState {
     pub async fn verify_ssh_session(&self) -> Result<()> {
-        let mut session = self.ssh_session.lock().await;
+        let mut session = self.ssh_session.write().await;
 
         if let Err(e) = session.check().await {
             error!(%e, "SSH session check failed, attempting to reconnect...");

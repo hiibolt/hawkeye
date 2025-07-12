@@ -17,7 +17,7 @@ pub async fn remote_command (
 
     let session = state
         .ssh_session
-        .lock()
+        .read()
         .await;
     let mut session_command = if !use_script {
         let mut session_command = session

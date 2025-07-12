@@ -18,7 +18,7 @@ pub async fn verify_login (
     // Build our command
     let session = state
         .ssh_session
-        .lock()
+        .read()
         .await;
     let mut session_command = session
         .command("/opt/metis/el8/contrib/admin/batchmon/verify_login.sh");

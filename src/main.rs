@@ -12,7 +12,7 @@ use routes::AppState;
 
 use std::sync::Arc;
 
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::RwLock;
 use axum::{
     routing::{get, post}, Router
 };
@@ -69,7 +69,7 @@ async fn main() -> ! {
         url_prefix: url_prefix.clone(),
 
         status: RwLock::new(None),
-        ssh_session: Arc::new(Mutex::new(Session::connect_mux(
+        ssh_session: Arc::new(RwLock::new(Session::connect_mux(
             &format!("{remote_username}@{remote_hostname}"),
             KnownHosts::Strict
         ).await.expect("Failed to connect to remote host!"))),
