@@ -1,9 +1,14 @@
+use std::sync::Arc;
+
 use axum::response::IntoResponse;
 use axum::http::StatusCode;
-
-use anyhow::Result;
-use tokio::io::AsyncReadExt;
+use anyhow::{Result, Context, anyhow};
+use openssh::Session;
+use tokio::{io::AsyncReadExt, sync::Mutex};
 use axum::http::header;
+use tokio::sync::RwLock;
+use tracing::error;
+use backoff::ExponentialBackoff;
 
 
 pub mod api;
@@ -26,7 +31,30 @@ pub struct AppState {
     pub db: super::DB,
     pub url_prefix: String,
 
-    pub status: tokio::sync::RwLock<Option<ClusterStatus>>
+    pub ssh_session: Arc<Mutex<Session>>,
+    pub status:      RwLock<Option<ClusterStatus>>
+}
+impl AppState {
+    pub async fn verify_ssh_session(&self) -> Result<()> {
+        let mut session = self.ssh_session.lock().await;
+
+        if let Err(e) = session.check().await {
+            error!(%e, "SSH session check failed, attempting to reconnect...");
+            
+            *session = backoff::future::retry(ExponentialBackoff::default(), || async {
+                Ok(Session::connect_mux(
+                    &format!("{}@{}", self.remote_username, self.remote_hostname),
+                    openssh::KnownHosts::Strict
+                ).await.map_err(|e| {
+                    error!(%e, "Failed to reconnect SSH session!");
+                    anyhow!("Failed to reconnect SSH session! Error: {e:?}")
+                })?)
+            }).await
+                .context("Failed to reconnect SSH session after exponential backoff!")?;
+        }
+
+        Ok(())
+    }
 }
 /*
 struct HtmlTemplate<T>(T);

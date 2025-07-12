@@ -1,10 +1,12 @@
-use std::{collections::{BTreeMap, HashMap, HashSet}, time::{SystemTime, UNIX_EPOCH}};
+use std::{collections::{BTreeMap, HashMap, HashSet}, sync::Arc, time::{SystemTime, UNIX_EPOCH}};
 
 use chrono::{DateTime, Utc};
 use anyhow::{Context, Result, anyhow};
 use rusqlite::{params, params_from_iter, Connection};
 use tracing::{info, error};
 use tokio::sync::Mutex;
+
+use crate::routes::AppState;
 
 use super::super::remote::auth::verify_login;
 
@@ -140,7 +142,7 @@ impl DB {
                 job.get("job_state").context("Missing job state")?,
                 job.get("start_time").context("Missing job start time")?,
                 job.get("queue").context("Missing job queue")?,
-                job.get("Nodes").context("Missing job nodes")?,
+                job.get("Nodes").unwrap_or(&String::from("None")),
                 job.get("Resource_List.mem").context("Missing job memory")?,
                 job.get("Resource_List.ncpus").unwrap_or(&String::from("0")),
                 job.get("Resource_List.ngpus").unwrap_or(&String::from("0")),
@@ -149,9 +151,9 @@ impl DB {
                 job.get("mem_efficiency").context("Missing job memory efficiency")?,
                 job.get("walltime_efficiency").context("Missing job walltime efficiency")?,
                 job.get("cpu_efficiency").context("Missing job CPU efficiency")?,
-                job.get("resources_used.cpupercent").context("Missing job CPU percent")?,
-                job.get("resources_used.mem").context("Missing job used memory")?,
-                job.get("resources_used.walltime").context("Missing job used walltime")?,
+                job.get("resources_used.cpupercent").unwrap_or(&String::from("0.0")),
+                job.get("resources_used.mem").unwrap_or(&String::from("0.0")),
+                job.get("resources_used.walltime").unwrap_or(&String::from("00:00:00")),
                 job.get("end_time").unwrap_or(&i32::MAX.to_string()),
                 chunks,
                 job.get("Exit_status").unwrap_or(&String::from("Not Yet Completed")),
@@ -160,22 +162,24 @@ impl DB {
             ],
         )?;
         
-        // Add the latest stats
-        // Get the current system time
-        let now = SystemTime::now();
-        let duration_since_epoch = now.duration_since(UNIX_EPOCH)
-            .context("Time went backwards")?;
-        let datetime = DateTime::<Utc>::from(UNIX_EPOCH + duration_since_epoch);
-        let formatted_datetime = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
-        conn.execute(
-            "INSERT INTO PastStats (pbs_id, cpu_percent, mem, datetime) VALUES (?1, ?2, ?3, ?4)",
-            params![
-                job.get("job_id").context("Missing job ID")?,
-                job.get("cpu_efficiency").context("Missing job CPU efficiency")?,
-                job.get("resources_used.mem").context("Missing job used memory")?,
-                formatted_datetime
-            ],
-        )?;
+        // Add the latest stats if the job is running
+        if job.get("job_state") == Some(&String::from("R")) {
+            // Get the current system time
+            let now = SystemTime::now();
+            let duration_since_epoch = now.duration_since(UNIX_EPOCH)
+                .context("Time went backwards")?;
+            let datetime = DateTime::<Utc>::from(UNIX_EPOCH + duration_since_epoch);
+            let formatted_datetime = datetime.format("%Y-%m-%d %H:%M:%S").to_string();
+            conn.execute(
+                "INSERT INTO PastStats (pbs_id, cpu_percent, mem, datetime) VALUES (?1, ?2, ?3, ?4)",
+                params![
+                    job.get("job_id").context("Missing job ID")?,
+                    job.get("cpu_efficiency").context("Missing job CPU efficiency")?,
+                    job.get("resources_used.mem").context("Missing job used memory")?,
+                    formatted_datetime
+                ],
+            )?;
+        }
 
         Ok(())
     }
@@ -671,16 +675,14 @@ impl DB {
 
     pub async fn login (
         &self,
-        remote_username: &str,
-        remote_hostname: &str,
+        state:    &Arc<AppState>,
         username: &str,
         password: &str
     ) -> Result<LoginResult> {
         let conn = self.conn.lock().await;
 
         match verify_login(
-            remote_username,
-            remote_hostname,
+            state,
             &username,
             &password
         )

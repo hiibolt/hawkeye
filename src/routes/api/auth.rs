@@ -24,17 +24,13 @@ pub async fn login (
     session.clear().await;
 
     // Attempt to verify (username, password) with your "verify_login"
-    let remote_username = app.remote_username.clone();
-    let remote_hostname = app.remote_hostname.clone();
-
     let username = &payload.one;
     let password = &payload.two;
 
     let login_result = app
         .db
         .login(
-            &remote_username,
-            &remote_hostname,
+            &app,
             username,
             password
         )
@@ -48,8 +44,8 @@ pub async fn login (
         // Lookup groups and old jobs for the user
         let mut tasks = JoinSet::new();
         
-        tasks.spawn(grab_group_thread(app.clone(), remote_username.clone(), remote_hostname.clone(), username.to_string()));
-        tasks.spawn(grab_old_jobs_thread(app.clone(), remote_username, remote_hostname, username.to_string()));
+        tasks.spawn(grab_group_thread(app.clone(), username.to_string()));
+        tasks.spawn(grab_old_jobs_thread(app.clone(), username.to_string()));
         
         tasks.join_all().await;
     }

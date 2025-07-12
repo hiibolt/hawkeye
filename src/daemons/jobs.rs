@@ -14,7 +14,7 @@ use super::super::{
 const DEFAULT_JOBSTAT_PERIOD: u64 = 60 * 5;
 const DEFAULT_OLD_JOB_PERIOD: u64 = 60 * 30;
 
-fn render_full_error (
+pub fn render_full_error (
     e: &anyhow::Error
 ) -> String {
     let mut full_error = String::new();
@@ -30,13 +30,10 @@ fn render_full_error (
 #[tracing::instrument]
 pub async fn grab_old_jobs_thread (
     app: Arc<AppState>,
-    remote_username: String,
-    remote_hostname: String,
     user: String
 ) -> Result<()> {
     let old_jobs_raw = remote_command(
-        &remote_username,
-        &remote_hostname,
+        &app,
         "jmanl",
         vec!(&user, "year", "raw"),
         true
@@ -142,20 +139,13 @@ async fn grab_old_jobs_helper (
         .await
         .context("Couldn't get users!")?;
 
-    let remote_username = app.remote_username.clone();
-    let remote_hostname = app.remote_hostname.clone();
-
     let mut tasks = JoinSet::new();
     for user in users {
         let app = app.clone();
-        let remote_username = remote_username.clone();
-        let remote_hostname = remote_hostname.clone();
         let user_cloned = user.clone();
         tasks.spawn(async move {
             if let Err(e) = grab_old_jobs_thread(
                 app,
-                remote_username,
-                remote_hostname,
                 user_cloned
             ).await {
                 let full_error = render_full_error(&e);
@@ -201,12 +191,8 @@ pub async fn old_jobs_daemon (
 async fn grab_jobs_helper (
     app: Arc<AppState>
 ) -> Result<()> {
-    let username = app.remote_username.clone();
-    let hostname = app.remote_hostname.clone();
-
     let jobstat_output: String = remote_command(
-        &username,
-        &hostname,
+        &app,
         "jobstat",
         vec!("-anL"),
         true
@@ -276,7 +262,7 @@ async fn grab_jobs_helper (
         app.db
             .insert_job(job)
             .await
-            .with_context(|| "Couldn't insert new job {job:?}!")?;
+            .with_context(|| format!("Couldn't insert new job {job:?}!"))?;
     }
 
     // Mark jobs that are no longer active as 'S' (stopped)
@@ -307,6 +293,7 @@ pub async fn jobs_daemon ( app: Arc<AppState> ) -> ! {
     loop {
         info!("Pulling jobs...");
         if let Err(e) = grab_jobs_helper( app.clone() ).await {
+            let e = render_full_error(&e);
             error!(%e, "Failed to run remote command!");
 
             tokio::time::sleep(tokio::time::Duration::from_secs(

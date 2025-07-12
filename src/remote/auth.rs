@@ -1,23 +1,25 @@
-use anyhow::{Result, anyhow};
-use openssh::{KnownHosts, Session};
+use std::sync::Arc;
+
+use anyhow::{Result, Context, anyhow};
 use tracing::error;
+
+use crate::routes::AppState;
 
 #[tracing::instrument]
 pub async fn verify_login (
-    remote_username: &str,
-    remote_hostname: &str,
+    state:    &Arc<AppState>,
     username: &str,
     password: &str
 ) -> Result<bool> {
-    // Attempt to connect to METIS
-    let session = Session::connect_mux(&format!("{remote_username}@{remote_hostname}"), KnownHosts::Strict)
-        .await
-        .map_err(|e| {
-            error!(%e, "Error starting Metis connection!");
-            anyhow!("Error starting Metis connection! See below:\n{:#?}", e)
-        })?;
+    // Verify the SSH session
+    state.verify_ssh_session().await
+        .context("Couldn't verify SSH session!")?;
 
     // Build our command
+    let session = state
+        .ssh_session
+        .lock()
+        .await;
     let mut session_command = session
         .command("/opt/metis/el8/contrib/admin/batchmon/verify_login.sh");
     session_command.arg(username);

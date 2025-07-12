@@ -7,11 +7,12 @@ mod routes;
 
 use db::lib::*;
 use daemons::{groups::groups_daemon, jobs::{jobs_daemon, old_jobs_daemon}};
+use openssh::{KnownHosts, Session};
 use routes::AppState;
 
 use std::sync::Arc;
 
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use axum::{
     routing::{get, post}, Router
 };
@@ -56,18 +57,25 @@ async fn main() -> ! {
     // Create the shared state
     let url_prefix = std::env::var("URL_PREFIX")
         .unwrap_or(String::new());
+    let remote_username = std::env::var("REMOTE_USERNAME")
+        .expect("Missing `REMOTE_USERNAME` environment variable!");
+    let remote_hostname = std::env::var("REMOTE_HOSTNAME")
+        .expect("Missing `REMOTE_HOSTNAME` environment variable!");
     let state: Arc<AppState> = Arc::new(AppState {
-        remote_username: std::env::var("REMOTE_USERNAME")
-            .expect("Missing `REMOTE_USERNAME` environment variable!"),
-        remote_hostname: std::env::var("REMOTE_HOSTNAME")
-            .expect("Missing `REMOTE_HOSTNAME` environment variable!"),
         db: DB::new(
             &std::env::var("DB_PATH")
                 .expect("Missing `DB_PATH` environment variable!")
         ).expect("Failed to establish connection to DB!"),
         url_prefix: url_prefix.clone(),
 
-        status: RwLock::new(None)
+        status: RwLock::new(None),
+        ssh_session: Arc::new(Mutex::new(Session::connect_mux(
+            &format!("{remote_username}@{remote_hostname}"),
+            KnownHosts::Strict
+        ).await.expect("Failed to connect to remote host!"))),
+
+        remote_username,
+        remote_hostname,
     });
     
     info!("[ Starting daemons... ]");

@@ -1,20 +1,24 @@
+use std::sync::Arc;
+
 use anyhow::{Context, Result, bail};
-use openssh::{ Session, KnownHosts };
+
+use crate::routes::AppState;
 
 pub async fn remote_command (
-    username: &str,
-    hostname: &str,
+    state: &Arc<AppState>,
 
     command: &str,
     args: Vec<&str>,
     use_script: bool
 ) -> Result<String> {
-    // Attempt to connect to METIS
-    let session = Session::connect_mux(&format!("{username}@{hostname}"), KnownHosts::Strict)
-        .await
-        .map_err(|e| anyhow::anyhow!("Error starting Metis connection! See below:\n{:#?}", e))?;
+    // Verify the SSH session
+    state.verify_ssh_session().await
+        .context("Couldn't verify SSH session!")?;
 
-    // Add our args
+    let session = state
+        .ssh_session
+        .lock()
+        .await;
     let mut session_command = if !use_script {
         let mut session_command = session
             .command(command);
@@ -39,17 +43,13 @@ pub async fn remote_command (
     // Run the job
     let output = session_command
         .output().await
-        .context("Failed to run openpose command!")?;
+        .context("Failed to run remote command!")?;
 
     // Extract the output from stdout
     let stdout = String::from_utf8(output.stdout)
         .context("Server `stdout` was not valid UTF-8")?;
     let stderr = String::from_utf8(output.stderr)
         .context("Server `stderr` was not valid UTF-8")?;
-
-    // Close the SSH session
-    session.close().await
-        .context("Failed to close SSH session - probably fine.")?;
 
     // Treat any error output as fatal
     if !stderr.is_empty() {

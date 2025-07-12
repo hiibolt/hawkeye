@@ -1,10 +1,9 @@
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
-use tokio::task::JoinSet;
 use tracing::{info, error};
 
-use crate::routes::AppState;
+use crate::{daemons::jobs::render_full_error, routes::AppState};
 use super::super::remote::command::*;
 
 const GROUPS_PERIOD: u64 = 60 * 60;
@@ -12,13 +11,10 @@ const GROUPS_PERIOD: u64 = 60 * 60;
 #[tracing::instrument]
 pub async fn grab_group_thread (
     app: Arc<AppState>,
-    remote_username: String,
-    remote_hostname: String,
     user: String
 ) -> Result<()> {
     let group_output: String = remote_command(
-        &remote_username,
-        &remote_hostname,
+        &app,
         "groups",
         vec![&user],
         false
@@ -53,27 +49,19 @@ async fn grab_groups_helper ( app: Arc<AppState> ) -> Result<()> {
     info!("[ Got Users ]: {users:?}");
 
     // Spawn a task for each user, but collect the JoinHandles
-    let mut tasks = JoinSet::new();
     for user in users {
         let app = app.clone();
-        let remote_username = app.remote_username.clone();
-        let remote_hostname = app.remote_hostname.clone();
         let user_cloned = user.clone();
-        tasks.spawn(async move {
-            // We deliberately swallow the actual Result here, but you could propagate it
-            if let Err(e) = grab_group_thread(
-                app,
-                remote_username,
-                remote_hostname,
-                user_cloned
-            ).await {
-                error!(%e, "Failed to grab groups for {user}!");
-            }
-        });
-    }
 
-    // Await *all* tasks to finish
-    tasks.join_all().await;
+        // We deliberately swallow the actual Result here, but you could propagate it
+        if let Err(e) = grab_group_thread(
+            app,
+            user_cloned
+        ).await {
+            let e = render_full_error(&e);
+            error!(%e, "Failed to grab groups for {user}!");
+        }
+    }
 
     Ok(())
 }
