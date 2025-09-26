@@ -108,7 +108,7 @@ impl DB {
         conn.execute(
             "INSERT OR IGNORE INTO Users (name) VALUES (?1)",
             [&job.get("Job_Owner").context("Missing job owner")?],
-        )?;
+        ).context("Failed to `INSERT` user!")?;
 
         // Fix the `Resource_List.select` field (add `nchunks=` to the beginning)
         //  so that `1:ncpus=32:mpiprocs=32:ngpus=1:mem=50gb` becomes 
@@ -160,7 +160,7 @@ impl DB {
                 job.get("estimated.start_time").unwrap_or(&String::from("Already Started/Unknown")),
                 job.get("resources_used.cput").unwrap_or(&String::from("00:00:00")),
             ],
-        )?;
+        ).context("Failed to `INSERT` job!")?;
         
         // Add the latest stats if the job is running
         if job.get("job_state") == Some(&String::from("R")) {
@@ -178,7 +178,7 @@ impl DB {
                     job.get("resources_used.mem").context("Missing job used memory")?,
                     formatted_datetime
                 ],
-            )?;
+            ).context("Failed to `INSERT` job stats!")?;
         }
 
         Ok(())

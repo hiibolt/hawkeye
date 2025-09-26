@@ -17,6 +17,13 @@ pub fn convert_mem_to_f64 ( st: &str ) -> Result<f64> {
             .parse::<f64>()
             .context("Couldn't convert memory string to f64!")?
             * 0.0000009536743 );
+    } else if st.contains("mb") {
+        return Ok(st.split("mb")
+            .next()
+            .context("Invalid memory string!")?
+            .parse::<f64>()
+            .context("Couldn't convert memory string to f64!")?
+            * 0.0009765625 );
     } else if st.contains("gb") {
         return Ok(st.split("gb")
             .next()
@@ -110,16 +117,16 @@ pub fn jmanl_job_str_to_btree<'a>(
     entry.insert(
         "job_state".to_string(),
         prelim.get(1)
-            .context("Invalid field!")?
+            .context("Invalid `job_state` field!")?
             .to_string()
     );
     entry.insert(
         "job_id".to_string(),
         prelim.get(2)
-            .context("Invalid field!")?
+            .context("Invalid `job_id` (1/2) field!")?
             .split('.')
             .next()
-            .context("Invalid field!")?
+            .context("Invalid `job_id` (2/2) field!")?
             .to_string()
     );
 
@@ -127,7 +134,7 @@ pub fn jmanl_job_str_to_btree<'a>(
         let field = field.trim_ascii_start();
         let name = field.split("=")
             .next()
-            .context("Invalid field!")?;
+            .context("Invalid `name` field!")?;
         let value = field.split("=")
             .skip(1)
             .collect::<Vec<&str>>()
@@ -161,7 +168,7 @@ pub fn jmanl_job_str_to_btree<'a>(
     if let Some(entry) = entry.get_mut("Resource_List.mem") {
         *entry = (*entry).split("gb")
             .next()
-            .context("Invalid field!")?
+            .context("Invalid `Resource_List` field!")?
             .to_string();
     }
 
@@ -183,7 +190,7 @@ pub fn jmanl_job_str_to_btree<'a>(
             .flat_map(|node| {
                 node.split("/")
                     .next()
-                    .context("Invalid field!")
+                    .context("Invalid `exec_host` field!")
             })
             .collect::<Vec<&str>>()
             .join(",");
@@ -233,7 +240,7 @@ pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, 
             info!("Inserting for Job ID from ind 0 - {field}");
             continue;
         }
-        if field.starts_with("nodes: ") {
+        if field.starts_with("Nodes: ") {
             continue;
         }
 
@@ -241,10 +248,10 @@ pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, 
         info!("\t[ Analyzing Field ]\n{field} - {ind} - {field}");
         let name = field.split(" = ")
             .next()
-            .context("Invalid field!")?;
+            .context("Invalid `name` field!")?;
         let value = field.split(" = ")
             .nth(1)
-            .context("Invalid field!")?;
+            .context("Invalid `name` (missing value) field!")?;
 
         if name == "stime" {
             // Convert the start time to a UNIX timestamp
@@ -259,7 +266,7 @@ pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, 
             let owner = value
                 .split("@")
                 .next()
-                .context("Invalid field!")?
+                .context("Invalid `owner` field!")?
                 .to_string();
             entry.insert(
                 name, 
@@ -296,7 +303,7 @@ pub fn jobstat_job_str_to_btree<'a>( job: &'a str ) -> Result<BTreeMap<&'a str, 
     if let Some(entry) = entry.get_mut("Resource_List.mem") {
         *entry = (*entry).split("gb")
             .next()
-            .context("Invalid field!")?
+            .context("Invalid `Resource_List` field!")?
             .to_string();
     }
 

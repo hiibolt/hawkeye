@@ -32,7 +32,7 @@
     {% match username %}
         {% when None %}
         <div class="nav-item">
-            <p>Job names are currently redacted, please <a href="{{ url_prefix }}/login">log in</a> to view them.</p>
+            <p>Some information is currently redacted, please <a href="{{ url_prefix }}/login">log in</a> to view it.</p>
         </div>
         {% when Some with (_) %}
     {% endmatch %}

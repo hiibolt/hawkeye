@@ -3,7 +3,6 @@ use std::{collections::BTreeMap, sync::Arc};
 use anyhow::{anyhow, Context, Result};
 use regex::Regex;
 use tracing::{error, info};
-use tokio::task::JoinSet;
 
 use crate::routes::AppState;
 use super::super::{
@@ -11,8 +10,8 @@ use super::super::{
     parsing::jobs::*,
 };
 
-const DEFAULT_JOBSTAT_PERIOD: u64 = 60 * 5;
-const DEFAULT_OLD_JOB_PERIOD: u64 = 60 * 30;
+const DEFAULT_JOBSTAT_PERIOD: u64 = 60 * 15;
+const DEFAULT_OLD_JOB_PERIOD: u64 = 60 * 300;
 
 pub fn render_full_error (
     e: &anyhow::Error
@@ -139,22 +138,18 @@ async fn grab_old_jobs_helper (
         .await
         .context("Couldn't get users!")?;
 
-    let mut tasks = JoinSet::new();
     for user in users {
         let app = app.clone();
         let user_cloned = user.clone();
-        tasks.spawn(async move {
-            if let Err(e) = grab_old_jobs_thread(
-                app,
-                user_cloned
-            ).await {
-                let full_error = render_full_error(&e);
-                error!("Couldn't grab old jobs for {user}! {full_error}");
-            }
-        });
+        
+        if let Err(e) = grab_old_jobs_thread(
+            app,
+            user_cloned
+        ).await {
+            let full_error = render_full_error(&e);
+            error!("Couldn't grab old jobs for {user}! {full_error}");
+        }
     }
-
-    tasks.join_all().await;
 
     Ok(())
 }
@@ -200,16 +195,16 @@ async fn grab_jobs_helper (
         .context("Failed to run remote command!")?
         .replace("\r", "");
 
-    let cluster_status_data_raw = jobstat_output.split("nodes: ")
+    let cluster_status_data_raw = jobstat_output.split("Nodes: ")
         .nth(1)
         .ok_or(anyhow!("Invalid cluster status input! Input:\n{jobstat_output:?}"))?
         .replace("CPU cores: ", "")
         .replace("GPU cores: ", "")
-        .replace("used + ", "")
-        .replace("unused + ", "")
+        .replace("in-use + ", "")
+        .replace("available + ", "")
         .replace("unavailable = ", "")
         .replace(" total", "")
-        .replace("status: [R]unning", "")
+        .replace("Job status: [R]unning", "")
         .replace("[Q]ueued", "");
     let node_stats = cluster_status_data_raw.split("\n")
         .next()
@@ -244,7 +239,7 @@ async fn grab_jobs_helper (
 
     let jobs = job_strs.iter()
         .flat_map(|job| {
-            if job.starts_with("nodes: ") {
+            if job.starts_with("Nodes: ") {
                 return None;
             }
             match jobstat_job_str_to_btree(job) {
