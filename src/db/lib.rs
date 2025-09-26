@@ -13,7 +13,7 @@ use super::super::remote::auth::verify_login;
 #[derive(Debug)]
 pub struct DB {
     conn: Mutex<Connection>,
-    groups_cache: Mutex<HashMap<String, HashSet<String>>>
+    groups_cache: Mutex<HashMap<String, Vec<String>>>
 }
 pub struct LoginResult {
     pub success: bool,
@@ -186,7 +186,7 @@ impl DB {
 
     pub async fn get_groups_cache (
         &self
-    ) -> HashMap<String, HashSet<String>> {
+    ) -> HashMap<String, Vec<String>> {
         self.groups_cache.lock().await.clone()
     }
     pub async fn insert_user_groups (

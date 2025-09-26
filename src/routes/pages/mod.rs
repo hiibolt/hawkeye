@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use axum::{http::{self, StatusCode}, response::Response};
 use tracing::{error, info};
 use anyhow::{Context, Result};
@@ -67,7 +67,7 @@ enum TableStat {
 impl TableStat {
     fn adjust_job (
         &self,
-        group_cache: &HashMap<String, HashSet<String>>,
+        group_cache: &HashMap<String, Vec<String>>,
         job: &mut BTreeMap<String, String>
     ) -> Result<()> {
         match self {
@@ -78,7 +78,7 @@ impl TableStat {
                 job.insert(
                     String::from("project"),
                     group_cache.get(owner)
-                        .unwrap_or(&HashSet::new())
+                        .unwrap_or(&Vec::new())
                         .into_iter()
                         .next()
                         .and_then(|st| Some(st.to_owned()))
@@ -730,70 +730,70 @@ fn try_render_template <T: ?Sized + askama::Template> (
         })
 }
 #[tracing::instrument]
-    fn sort_build_parse (
-        groups_cache: HashMap<String, HashSet<String>>,
-        table_stats: Vec<TableStat>,
+fn sort_build_parse (
+    groups_cache: HashMap<String, Vec<String>>,
+    table_stats: Vec<TableStat>,
 
-        jobs: &mut Vec<BTreeMap<String, String>>,
-        params: &HashMap<String, String>,
-        username: Option<String>
-    ) -> (
-        Vec<TableEntry>, // Table entries
-        Option<String>,  // Error string
-    ) {
-        // Sort the jobs by any sort and reverse queries
-        sort_jobs(
-            jobs,
-            params.get("sort"),
-            params.get("reverse"),
-            username.is_some()
-        );
+    jobs: &mut Vec<BTreeMap<String, String>>,
+    params: &HashMap<String, String>,
+    username: Option<String>
+) -> (
+    Vec<TableEntry>, // Table entries
+    Option<String>,  // Error string
+) {
+    // Sort the jobs by any sort and reverse queries
+    sort_jobs(
+        jobs,
+        params.get("sort"),
+        params.get("reverse"),
+        username.is_some()
+    );
 
-        // Tweak data to be presentable and add tooltips for efficiencies
-        let mut errors = Vec::new();
-        for job_ref in jobs.iter_mut() {
-            // Add tooltip for exit status
-            add_exit_status_tooltip(job_ref);
+    // Tweak data to be presentable and add tooltips for efficiencies
+    let mut errors = Vec::new();
+    for job_ref in jobs.iter_mut() {
+        // Add tooltip for exit status
+        add_exit_status_tooltip(job_ref);
 
-            for table_stat in table_stats.iter() {
-                if let Err(e) = table_stat.adjust_job(&groups_cache, job_ref) {
-                    errors.push(e);
-                }
-                if let Err(e) = table_stat.ensure_needed_field(job_ref) {
-                    errors.push(e);
-                }
+        for table_stat in table_stats.iter() {
+            if let Err(e) = table_stat.adjust_job(&groups_cache, job_ref) {
+                errors.push(e);
+            }
+            if let Err(e) = table_stat.ensure_needed_field(job_ref) {
+                errors.push(e);
             }
         }
-        let errors = errors
-            .iter()
-            .map(|e| e.to_string())
-            .enumerate()
-            .map(|(i, e)| format!("{}. {}", i + 1, e))
-            .collect::<Vec<String>>()
-            .join("\n");
-
-        // If there are errors, wipe the jobs
-        if !errors.is_empty() {
-            jobs.clear();
-
-            // Print the errors if there are any
-            error!(%errors, "Errors while parsing jobs!");
-        }
-
-        // Reverse the results
-        jobs.reverse();
-
-        // Censor job owners if the user is not authenticated
-        if username.is_none() {
-            for job in jobs.iter_mut() {
-                job.insert(String::from("owner"), String::from("REDACTED"));
-            }
-        }
-
-        (
-            table_stats.into_iter()
-                .map(|table_stat| table_stat.into() )
-                .collect(),
-            (!errors.trim().is_empty()).then_some(errors)
-        )
     }
+    let errors = errors
+        .iter()
+        .map(|e| e.to_string())
+        .enumerate()
+        .map(|(i, e)| format!("{}. {}", i + 1, e))
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    // If there are errors, wipe the jobs
+    if !errors.is_empty() {
+        jobs.clear();
+
+        // Print the errors if there are any
+        error!(%errors, "Errors while parsing jobs!");
+    }
+
+    // Reverse the results
+    jobs.reverse();
+
+    // Censor job owners if the user is not authenticated
+    if username.is_none() {
+        for job in jobs.iter_mut() {
+            job.insert(String::from("owner"), String::from("REDACTED"));
+        }
+    }
+
+    (
+        table_stats.into_iter()
+            .map(|table_stat| table_stat.into() )
+            .collect(),
+        (!errors.trim().is_empty()).then_some(errors)
+    )
+}

@@ -1,7 +1,7 @@
 use super::super::AppState;
 use super::{timestamp_field_to_date, try_render_template, TableEntry, TableStat, TableStatType, Toolkit, PageType, sort_build_parse};
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::Result;
@@ -187,7 +187,7 @@ pub async fn stats(
         job.0.insert(
             String::from("project"),
             groups_cache.get(owner)
-                .unwrap_or(&HashSet::new())
+                .unwrap_or(&Vec::new())
                 .into_iter()
                 .next()
                 .and_then(|st| Some(st.to_owned()))
